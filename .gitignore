@@ -1,0 +1,4 @@
+*.so
+*.o
+pong_irq
+pong_curl
