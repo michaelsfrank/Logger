@@ -27,7 +27,8 @@ dump: examples/dump.o
 	$(CC) $(CPPFLAGS) $(LDFLAGS) $(LDLIBS) -o dump $(CFLAGS) -lnrf24 examples/dump.o
 
 Logger: examples/Logger.o
-	$(CC) $(CPPFLAGS) -L. -lnrf24 -L/usr/local/lib -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
+	$(CC) $(CPPFLAGS) -L/usr/local/lib -lnrf24 -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
+#	$(CC) $(CPPFLAGS) -L. -lnrf24 -L/usr/local/lib -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
 #	$(CC) $(CPPFLAGS) -L/usr/local/lib -lcgeneric_0.4.2 -lwiringPi -lwiringPiDev -lpthread -lm -L. -lnrf24 -o Logger $(CFLAGS) examples/Logger.o
 	#$(CC) $(CPPFLAGS) -L. -lnrf24 -L/usr/local/lib -lcgeneric_0.4.2 -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
 	#$(CC) $(CPPFLAGS) -L/usr/local/lib -lcgeneric_0.4.2 -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
