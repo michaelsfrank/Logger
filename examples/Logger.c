@@ -1028,7 +1028,7 @@ int main (void)
 			pubmsg.payloadlen = strlen(buffer_char);
 			MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
 			
-			sprintf(MQTT_topic,"Home/Systems/%s/Wifi/Level\0",hostname);
+			sprintf(MQTT_topic,"Home/Systems/%s/Wifi/Level",hostname);
 			sprintf(buffer_char, "%d\0", wstats.qual.level);
 			pubmsg.payload = buffer_char;
 			pubmsg.payloadlen = strlen(buffer_char);
@@ -1039,7 +1039,6 @@ int main (void)
 			pubmsg.payload = buffer_char;
 			pubmsg.payloadlen = strlen(buffer_char);
 			MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
-			*/
 		}
  
 		
