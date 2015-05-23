@@ -1,17 +1,9 @@
 /*
- * isr.c:
- *	Wait for Interrupt test program - ISR method
+ * Logger.c:
+ *	Gather sensor data, forward
  *
- *	How to test:
- *	  Use the SoC's pull-up and pull down resistors that are avalable
- *	on input pins. So compile & run this program (via sudo), then
- *	in another terminal:
- *		gpio mode 0 up
- *		gpio mode 0 down
- *	at which point it should trigger an interrupt. Toggle the pin
- *	up/down to generate more interrupts to test.
  *
- * Copyright (c) 2013 Gordon Henderson.
+ * Copyright (c) 2015 Michael Frank
  ***********************************************************************
  * This file is part of wiringPi:
  *	https://projects.drogon.net/raspberry-pi/wiringpi/
@@ -45,6 +37,17 @@
 #include <unistd.h>		// MF copied from dump.c 7-Feb-2015
 
 #include <time.h>		// timing
+#include <sys/types.h> 
+
+#include <sys/ioctl.h>		// WIFI SIGNAL INFO
+#include <sys/stat.h>
+#include <sys/socket.h>		// WIFI SIGNAL INFO
+#include <linux/if.h>		// WIFI SIGNAL INFO
+//#include <linux/if_tun.h>	// WIFI SIGNAL INFO
+#include <linux/wireless.h>	// WIFI SIGNAL INFO
+
+
+
 
 #include <rf24.h>		// nRF
 //#include <nRF24L01.h>	// nRF
@@ -60,33 +63,40 @@
 #include "nRF24L01.h"	// nRF
 //#include "gpio.h"		// nRF
 
+
 #define PAYLOAD_SIZE 8	// nRF
 
 #define LOCAL_DATA_INTERVAL 2	// Logger - main loop
 
-// Logger interface to wiringPi - wiringPi pin numbers for i/o
-#define GARAGE_DOOR_NEAR_STATUS 26
-#define GARAGE_DOOR_MID_STATUS 27
-#define GARAGE_DOOR_FAR_STATUS 28
-#define GARAGE_DOOR_SIDE_STATUS 29
-#define GARAGE_DOOR_NEAR_COMMAND 21
-#define GARAGE_DOOR_NEAR_LIGHT 22
-#define GARAGE_DOOR_MID_COMMAND 23
-#define GARAGE_DOOR_MID_LIGHT 24
-#define RELAY_ENABLE 25
+//#if HOST == Pi4
+	#define STATUS1 26
+	#define STATUS2 27
+	#define STATUS3 28
+	#define STATUS4 29
+	#define RELAY1 21
+	#define RELAY2 22
+	#define RELAY3 23
+	#define RELAY4 24
+	#define RELAY_ENABLE 25
+//#endif
+	
+#if HOST == Pi1
+	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+	#define CLIENTID    "Pi1"							// MQTT
+#elseif HOST == Pi2
+	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+	#define CLIENTID    "Pi2"							// MQTT
+#elseif HOST == Pi3
+	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+	#define CLIENTID    "Pi3"							// MQTT
+#elseif HOST == Pi4
+	#define ADDRESS     "tcp://localhost:1883"			// MQTT
+	#define CLIENTID    "Pi4"							// MQTT
+#endif
 
-// Logger interface to wiringPi - wiringPi pin numbers for i/o
-#define STATUS1 GARAGE_DOOR_NEAR_STATUS
-#define STATUS2 GARAGE_DOOR_MID_STATUS
-#define STATUS3 GARAGE_DOOR_FAR_STATUS
-#define STATUS4 GARAGE_DOOR_SIDE_STATUS
-#define RELAY1 GARAGE_DOOR_NEAR_COMMAND
-#define RELAY2 GARAGE_DOOR_NEAR_LIGHT
-#define RELAY3 GARAGE_DOOR_MID_COMMAND
-#define RELAY4 GARAGE_DOOR_MID_LIGHT
+#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
 
-#define ADDRESS     "tcp://localhost:1883"			// MQTT
-//#define ADDRESS     "tcp://192.168.1.214:1883"	// MQTT
+//#define ADDRESS     	// MQTT
 #define CLIENTID    "Pi4"							// MQTT
 #define TOPIC       "MQTT Examples"					// MQTT
 #define PAYLOAD     "Hello World!"					// MQTT
@@ -96,6 +106,28 @@
 // MF macros
 #define _BV(x) (1 << (x))	
 #define _BN(x, n) ( ( (unsigned char *)(&(x)) )[(n)] )
+
+
+
+/*
+// WIFI SIGNAL INFO
+// http://blog.ajhodges.com/2011/10/using-ioctl-to-gather-wifi-information.html
+struct signalInfo {
+    char mac[18];
+    char ssid[33];
+    int bitrate;
+    int level;
+};
+typedef struct signalInfo signalInfo_t;  // MF queue
+signalInfo_t signalInfoData;	  // MF queue
+*/
+
+
+// WIFI SIGNAL INFO - TRY #2
+#define IW_INTERFACE "wlan0"
+extern int errno;
+//struct iwreq wreq;
+
 
 int32_t intcmp(const void *, const void *,size_t);	// c-generic-library
 void  print(const void *);							// c-generic-library
@@ -119,9 +151,7 @@ struct data_queue {
   uint8_t d[32];
   uint8_t next;
 };					
-
 typedef struct data_queue data_queue_t;  // MF queue
-
 data_queue_t data;	  // MF queue
 
 rf24_t radio_global;	// nRF
@@ -582,6 +612,80 @@ void connlost(void *context, char *cause)
 }
 
 
+/*
+
+// WIFI SIGNAL INFO
+// http://blog.ajhodges.com/2011/10/using-ioctl-to-gather-wifi-information.html
+int getSignalInfo(signalInfo_t *sigInfo, char *iwname){
+    iwreq req;
+    strcpy(req.ifr_name, iwname);
+    struct iw_statistics *stats;
+ 
+    //have to use a socket for ioctl
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+ 
+    //make room for the iw_statistics object
+	req.u.data.pointer = (struct iw_statistics *) malloc(sizeof(* stats));
+	req.u.data.length = sizeof(* stats);
+	req.u.data.flags = 1;
+
+    //this will gather the signal strength
+    if(ioctl(sockfd, SIOCGIWSTATS, &req) == -1){
+        //die with error, invalid interface
+        fprintf(stderr, "Invalid interface.\n");
+        return(-1);
+    }
+    else if(((iw_statistics *)req.u.data.pointer)->qual.updated & IW_QUAL_DBM){
+        //signal is measured in dBm and is valid for us to use
+        sigInfo->level=((iw_statistics *)req.u.data.pointer)->qual.level - 256;
+    }
+ 
+    //SIOCGIWESSID for ssid
+    char buffer[32];
+    memset(buffer, 0, 32);
+    req.u.essid.pointer = buffer;
+    req.u.essid.length = 32;
+    //this will gather the SSID of the connected network
+    if(ioctl(sockfd, SIOCGIWESSID, &req) == -1){
+        //die with error, invalid interface
+        return(-1);
+    }
+    else{
+        memcpy(&sigInfo->ssid, req.u.essid.pointer, req.u.essid.length);
+        memset(&sigInfo->ssid[req.u.essid.length],0,1);
+    }
+ 
+    //SIOCGIWRATE for bits/sec (convert to mbit)
+    int bitrate=-1;
+    //this will get the bitrate of the link
+    if(ioctl(sockfd, SIOCGIWRATE, &req) == -1){
+        fprintf(stderr, "bitratefail");
+        return(-1);
+    }else{
+        memcpy(&bitrate, &req.u.bitrate, sizeof(int));
+        sigInfo->bitrate=bitrate/1000000;
+    }
+ 
+ 
+    //SIOCGIFHWADDR for mac addr
+    ifreq req2;
+    strcpy(req2.ifr_name, iwname);
+    //this will get the mac address of the interface
+    if(ioctl(sockfd, SIOCGIFHWADDR, &req2) == -1){
+        fprintf(stderr, "mac error");
+        return(-1);
+    }
+    else{
+        sprintf(sigInfo->mac, "%.2X", (unsigned char)req2.ifr_hwaddr.sa_data[0]);
+        for(int s=1; s<6; s++){
+            sprintf(sigInfo->mac+strlen(sigInfo->mac), ":%.2X", (unsigned char)req2.ifr_hwaddr.sa_data[s]);
+        }
+    }
+    close(sockfd);
+}
+
+
+*/
 
 /*
  *********************************************************************************
@@ -591,6 +695,7 @@ void connlost(void *context, char *cause)
 
 int main (void)
 {
+	char hostname[20]={0};
 	int gotOne, pin ;	// isr
 	int myCounter [8] ;	// isr
 	int i;	// address counter	// isr
@@ -601,10 +706,12 @@ int main (void)
 	//unsigned int t=0;			// time
 	//QueueList  object;	// c-generic-library
 	//data_queue_t data;	// c-generic-library
+
     
 	char 	buffer_char[256];
 	float 	buffer_f=0;
 	double 	buffer_lf=0;
+	uint8_t buffer_u8=0;
 	FILE *fp;
 	
 	unsigned int d[32]={0};
@@ -616,8 +723,30 @@ int main (void)
 	struct ds18b20 *devNode;
 	int8_t devCnt=0;
 	
+	// WIFI SIGNAL INFO - TRY #2
+	int sockfd;
+    struct iwreq wreq;				//	http://w1.fi/hostapd/devel/structiwreq.html
+	struct iw_statistics wstats;	//	http://w1.fi/hostapd/devel/structiw__statistics.html
+	
+    
+	
+	// HOST
+	#if HOST == Pi1
+		strcpy(hostname,"Pi1\0");
+	#elif HOST == Pi2
+		strcpy(hostname,"Pi2\0");
+	#elif HOST == Pi3
+		strcpy(hostname,"Pi3\0");
+	#elif HOST == Pi4
+		strcpy(hostname,"Pi4\0");
+	#else
+		strcpy(hostname,"unknown\0");
+	#endif
+	printf("HOST = %s\n ",hostname);
+	
 	//MQTT
-    MQTTClient client;
+    char MQTT_topic[256]={0};
+	MQTTClient client;
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
     MQTTClient_message pubmsg = MQTTClient_message_initializer;
     MQTTClient_deliveryToken token;
@@ -796,9 +925,7 @@ int main (void)
 			pubmsg.payloadlen = strlen(buffer_char);
 			MQTTClient_publishMessage(client, "Home/Garage/Status/Door/Far", &pubmsg, &token);
 		}
-		
 		*/
-		
 		
 		/*
 		// MQTT Test Publish
@@ -812,8 +939,7 @@ int main (void)
 		//if(deliveredtoken != token)
 		//	printf("[MQTT] Still not delivered\n");
 		*/
-
-
+		
 		buffer_f=0;
 		// Read CPU Temp
 		fp = fopen ("/sys/class/thermal/thermal_zone0/temp", "r");
@@ -823,14 +949,114 @@ int main (void)
 		buffer_lf /= 1000;
 		//printf ("[Logger] local Pi CPU temp is %.3f C.\n", buffer_lf);
 		fclose (fp);
-		sprintf(buffer_char, "%.3f\0", buffer_lf);		
+		sprintf(buffer_char, "%.3f\0", buffer_lf);
 		
 		// MQTT local Pi CPU temp
+		sprintf(MQTT_topic,"Home/Systems/%s/Temp/CPUTemp\0",hostname);
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
-		MQTTClient_publishMessage(client, "Home/Systems/Pi1/Temp/CPUTemp", &pubmsg, &token);
-		printf("[MQTT] %s on topic %s\n", pubmsg.payload, "Home/Systems/Pi1/Temp/CPUTemp");
+		MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
+		//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "Home/Systems/Pi1/Temp/CPUTemp");
 		
+		
+		
+		
+		
+		
+		
+		
+		
+		// WIFI SIGNAL INFO - TRY #2
+		
+		
+		memset(&wreq, 0, sizeof(struct iwreq));
+		wreq.u.essid.length = IW_ESSID_MAX_SIZE+1;
+		sprintf(wreq.ifr_name, IW_INTERFACE);
+
+		if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+			fprintf(stderr, "Cannot open socket \n");
+			fprintf(stderr, "errno = %d \n", errno);
+			fprintf(stderr, "Error description is : %s\n",strerror(errno));
+		} else printf("\nSocket opened successfully \n");
+
+		
+		memset(buffer_char, 0, sizeof(buffer_char));
+		wreq.u.essid.pointer = buffer_char;
+		wreq.u.essid.length = sizeof(buffer_char);
+		
+		/*
+		if (ioctl(sockfd,SIOCGIWESSID, &wreq) == -1) {
+			fprintf(stderr, "[IOCTL] Get ESSID ioctl failed \n");
+			fprintf(stderr, "[IOCTL] errno = %d \n", errno);
+			fprintf(stderr, "[IOCTL] Error description : %s\n",strerror(errno));
+    
+		} else {
+			printf("[IOCTL] IOCTL Successfull\n");
+			printf("[IOCTL] ESSID is %s\n", (char *)wreq.u.essid.pointer);
+		}
+		
+	
+	
+		//make room for the iw_statistics object
+		//wreq.u.data.pointer = (struct iw_statistics *) malloc(sizeof(* wstats));
+		*/
+		wreq.u.data.pointer = &wstats;
+		wreq.u.data.length = sizeof(wstats);
+		wreq.u.data.flags = 1;
+
+		
+		
+		//this will gather the signal strength
+		//if(ioctl(sockfd, SIOCGIWSTATS, &wreq) == -1){
+		if(ioctl(sockfd, SIOCGIWSTATS, &wreq) == -1){
+			printf("Invalid interface.\n");
+		}
+		else {
+		//else if(((iw_statistics *)wreq.u.data.pointer)->qual.updated & IW_QUAL_DBM){
+			
+			sprintf(MQTT_topic,"Home/Systems/%s/Wifi/Level\0",hostname);
+						
+			//buffer_u8=((iw_statistics *)wreq.u.data.pointer)->qual.level - 256;
+
+			printf("wstats.qual.qual : %d\n",wstats.qual.qual);
+			printf("wstats.qual.level : %d\n",wstats.qual.level);
+			printf("wstats.qual.noise : %d\n",wstats.qual.noise);
+
+			sprintf(MQTT_topic,"Home/Systems/%s/Wifi/Qual\0",hostname);
+			sprintf(buffer_char, "%d\0", wstats.qual.qual);
+			pubmsg.payload = buffer_char;
+			pubmsg.payloadlen = strlen(buffer_char);
+			MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
+			
+			sprintf(MQTT_topic,"Home/Systems/%s/Wifi/Level\0",hostname);
+			sprintf(buffer_char, "%d\0", wstats.qual.level);
+			pubmsg.payload = buffer_char;
+			pubmsg.payloadlen = strlen(buffer_char);
+			MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
+			
+			sprintf(MQTT_topic,"Home/Systems/%s/Wifi/Noise\0",hostname);
+			sprintf(buffer_char, "%d\0", wstats.qual.noise);
+			pubmsg.payload = buffer_char;
+			pubmsg.payloadlen = strlen(buffer_char);
+			MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
+			*/
+		}
+ 
+		
+		//SIOCGIWRATE for bits/sec (convert to mbit)
+		int bitrate=-1;
+
+		if(ioctl(sockfd, SIOCGIWRATE, &wreq) == -1){
+			printf("[IOCTL] bitratefail\n");
+		}else{
+			memcpy(&bitrate, &wreq.u.bitrate, sizeof(int));
+			buffer_u8=bitrate/1000000;
+		}
+			
+			
+			
+			
+			
 		
 		buffer_lf=0;
 		// Read BMP180		
@@ -908,15 +1134,9 @@ int main (void)
 			// MQTT local bmp180 pressure sensor
 			pubmsg.payload = buffer_char;
 			pubmsg.payloadlen = strlen(buffer_char);
-			
-			
-			if (!strcmp(devNode->devID, "28-?"))
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi4Unknown", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-04146c93f6ff"))
-				MQTTClient_publishMessage(client, "Home/Garage/Temp/Temp1", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-04146d1220ff"))
-				MQTTClient_publishMessage(client, "Home/Outside/Temp/Temp1", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-000005eaf6c1"))
+
+#if HOST == Pi1
+			if (!strcmp(devNode->devID, "28-000005eaf6c1"))
 				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Ceiling1", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005e99b06"))
 				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Ceiling2", &pubmsg, &token);
@@ -927,8 +1147,47 @@ int main (void)
 			else if (!strcmp(devNode->devID, "28-000005ea416a"))
 				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor2", &pubmsg, &token);
 			else
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi4Unknown", &pubmsg, &token);
-			
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi1Unknown", &pubmsg, &token);
+#endif
+#if HOST == Pi2
+			if (!strcmp(devNode->devID, "28-000005eaf6c1"))
+				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Ceiling1", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-000005e99b06"))
+				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Ceiling2", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-000005eb03de"))
+				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Mid1", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-000005eb5b13"))
+				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor1", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-000005ea416a"))
+				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor2", &pubmsg, &token);
+			else
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi2Unknown", &pubmsg, &token);
+#endif
+#if HOST == Pi3
+			if (!strcmp(devNode->devID, "28-04146d2647ff"))
+				MQTTClient_publishMessage(client, "Home/Garage/Temp/Temp1", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-031467a707ff"))
+				MQTTClient_publishMessage(client, "Home/Outside/Temp/Temp1", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-04146cd4e5ff"))
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3Wifi", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-04146cf597ff"))
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3case", &pubmsg, &token);
+			else
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3Unknown", &pubmsg, &token);
+#endif
+#if HOST == Pi4
+			if (!strcmp(devNode->devID, "28-04146d2647ff"))
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Temp1", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-031467a707ff"))
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi4CPUtemp", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-04146cd4e5ff"))
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3Wifi", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-04146cf597ff"))
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3case", &pubmsg, &token);
+			else
+				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3Unknown", &pubmsg, &token);
+#endif
+
 			printf("[MQTT] %s on topic %s\n", pubmsg.payload, "...");
 			printf("[1wire] MQTT publish %s from sensor %s.\n",buffer_char, devNode->devID);
 

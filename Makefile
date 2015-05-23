@@ -1,7 +1,12 @@
-CC = arm-linux-gnueabihf-gcc
-#CC	= gcc
-CFLAGS	= -g -gdwarf-2 -Ofast -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s
-#CFLAGS	= -g -gdwarf-2 -Ofast -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s -Wall -pedantic
+#CC = arm-linux-gnueabihf-gcc
+CC	= gcc
+
+HOST=$(shell hostname)
+#HOME=$(HOME)
+
+
+CFLAGS	= -g -gdwarf-2 -Ofast -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s -D$(HOST) -D'HOST=$(HOST)'
+#CFLAGS	= -g -gdwarf-2 -Ofast -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s -D$(HOST) -D'HOST=$(HOST)' -Wall -pedantic 
 CPPFLAGS = -Iinclude
 LDFLAGS  = -L.
 LDLIBS   = -lnrf24
@@ -83,7 +88,6 @@ dump: examples/dump.o
 Logger: examples/Logger.o
 	$(CC) $(CPPFLAGS) -L/usr/local/lib -lbmp180 -lnrf24 -lpaho-mqtt3c -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
 
-	
 # Logger previous
 #	$(CC) $(CPPFLAGS) -L/usr/local/lib -lnrf24 -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
 #	$(CC) $(CPPFLAGS) -L/usr/local/lib -lcgeneric_0.4.2 -lwiringPi -lwiringPiDev -lpthread -lm -L. -lnrf24 -o Logger $(CFLAGS) examples/Logger.o
