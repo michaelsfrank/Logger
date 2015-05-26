@@ -875,6 +875,9 @@ int main (void)
 		//time(&now);
 		//time(&mark_time);
 
+		// ****************************
+		//      MAGNETIC CONTACTS
+		// ****************************
 		
 		
 		if (!digitalRead(STATUS1))
@@ -939,7 +942,12 @@ int main (void)
 		//if(deliveredtoken != token)
 		//	printf("[MQTT] Still not delivered\n");
 		*/
-		
+
+
+		// ****************************
+		//          CPU Temp
+		// ****************************
+
 		buffer_f=0;
 		// Read CPU Temp
 		fp = fopen ("/sys/class/thermal/thermal_zone0/temp", "r");
@@ -950,24 +958,18 @@ int main (void)
 		//printf ("[Logger] local Pi CPU temp is %.3f C.\n", buffer_lf);
 		fclose (fp);
 		sprintf(buffer_char, "%.3f\0", buffer_lf);
-		
+
 		// MQTT local Pi CPU temp
 		sprintf(MQTT_topic,"Home/Systems/%s/Temp/CPUTemp\0",hostname);
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
 		MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
 		//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "Home/Systems/Pi1/Temp/CPUTemp");
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		// WIFI SIGNAL INFO - TRY #2
-		
+
+
+		// ****************************
+		//          WIFI
+		// ****************************
 		
 		memset(&wreq, 0, sizeof(struct iwreq));
 		wreq.u.essid.length = IW_ESSID_MAX_SIZE+1;
@@ -1041,7 +1043,6 @@ int main (void)
 			MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
 		}
  
-		
 		//SIOCGIWRATE for bits/sec (convert to mbit)
 		int bitrate=-1;
 
@@ -1053,9 +1054,10 @@ int main (void)
 		}
 			
 			
-			
-			
-			
+
+		// ****************************
+		//      BAROMETRIC PRESSURE
+		// ****************************
 		
 		buffer_lf=0;
 		// Read BMP180		
@@ -1067,8 +1069,6 @@ int main (void)
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
 		MQTTClient_publishMessage(client, "Home/Garage/BP", &pubmsg, &token);
-
-
 		
 		humidity=0;
 		temperatureC=0;
@@ -1091,6 +1091,9 @@ int main (void)
 
 
 
+		// ****************************
+		//          ONE WIRE
+		// ****************************
 
 		rootNode = malloc( sizeof(struct ds18b20) );
 		devNode = rootNode;
@@ -1145,8 +1148,6 @@ int main (void)
 				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor1", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005ea416a"))
 				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor2", &pubmsg, &token);
-			else
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi1Unknown", &pubmsg, &token);
 #endif
 #if HOST == Pi2
 			if (!strcmp(devNode->devID, "28-000005eaf6c1"))
@@ -1159,36 +1160,26 @@ int main (void)
 				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor1", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005ea416a"))
 				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor2", &pubmsg, &token);
-			else
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi2Unknown", &pubmsg, &token);
 #endif
 #if HOST == Pi3
 			if (!strcmp(devNode->devID, "28-04146d2647ff"))
-				MQTTClient_publishMessage(client, "Home/Garage/Temp/Temp1", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Home/Systems/Pi3/Temp/Case", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-031467a707ff"))
-				MQTTClient_publishMessage(client, "Home/Outside/Temp/Temp1", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Home/Systems/Pi3/Temp/Wifi", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-04146cd4e5ff"))
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3Wifi", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Home/Garage/Temp", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-04146cf597ff"))
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3case", &pubmsg, &token);
-			else
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3Unknown", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Home/Outside/Temp", &pubmsg, &token);
 #endif
 #if HOST == Pi4
-			if (!strcmp(devNode->devID, "28-04146d2647ff"))
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Temp1", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-031467a707ff"))
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi4CPUtemp", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-04146cd4e5ff"))
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3Wifi", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-04146cf597ff"))
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3case", &pubmsg, &token);
-			else
-				MQTTClient_publishMessage(client, "Home/Systems/Temp/Pi3Unknown", &pubmsg, &token);
+			if (!strcmp(devNode->devID, "28-04146c93f6ff"))
+				MQTTClient_publishMessage(client, "Home/Systems/Pi4/Temp1", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-04146d1220ff"))
+				MQTTClient_publishMessage(client, "Home/Systems/Pi4/Temp2", &pubmsg, &token);
 #endif
 
-			printf("[MQTT] %s on topic %s\n", pubmsg.payload, "...");
-			printf("[1wire] MQTT publish %s from sensor %s.\n",buffer_char, devNode->devID);
+			#printf("[MQTT] %s on topic %s\n", pubmsg.payload, "...");
+			#printf("[1wire] MQTT publish %s from sensor %s.\n",buffer_char, devNode->devID);
 
 		}
 		
