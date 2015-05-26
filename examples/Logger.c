@@ -1178,8 +1178,8 @@ int main (void)
 				MQTTClient_publishMessage(client, "Home/Systems/Pi4/Temp2", &pubmsg, &token);
 #endif
 
-			#printf("[MQTT] %s on topic %s\n", pubmsg.payload, "...");
-			#printf("[1wire] MQTT publish %s from sensor %s.\n",buffer_char, devNode->devID);
+			//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "...");
+			//printf("[1wire] MQTT publish %s from sensor %s.\n",buffer_char, devNode->devID);
 
 		}
 		
