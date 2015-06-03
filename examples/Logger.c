@@ -21,8 +21,8 @@
  *    You should have received a copy of the GNU Lesser General Public License
  *    along with wiringPi.  If not, see <http://www.gnu.org/licenses/>.
  ***********************************************************************
- */
 
+*/
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -83,21 +83,20 @@
 #if HOST == Pi1
 	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
 	#define CLIENTID    "Pi1"							// MQTT
-#elseif HOST == Pi2
+#elif HOST == Pi2
 	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
 	#define CLIENTID    "Pi2"							// MQTT
-#elseif HOST == Pi3
+#elif HOST == Pi3
 	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
 	#define CLIENTID    "Pi3"							// MQTT
-#elseif HOST == Pi4
+#elif HOST == Pi4
 	#define ADDRESS     "tcp://localhost:1883"			// MQTT
 	#define CLIENTID    "Pi4"							// MQTT
+#else
+	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+	#define CLIENTID    "Default"							// MQTT
 #endif
 
-#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
-
-//#define ADDRESS     	// MQTT
-#define CLIENTID    "Pi4"							// MQTT
 #define TOPIC       "MQTT Examples"					// MQTT
 #define PAYLOAD     "Hello World!"					// MQTT
 #define QOS         1								// MQTT
@@ -196,11 +195,13 @@ int8_t findDevices(struct ds18b20 *d) {
 	struct ds18b20 *newDev;
 	char path[] = "/sys/bus/w1/devices";
 	int8_t i = 0;
+
 	dir = opendir(path);
-	//printf("[1-wire] FindDevices() dir=%s\n",dir);
+
 	if (dir != NULL)
 	{
 		while ((dirent = readdir(dir))) {
+			printf("[1-wire] FindDevices() dirent=readdir(dir)=%s\n",readdir);
 			//printf("[1-wire] FindDevices()   dirent->d_type=%d   dirent->d_name=%s\n",dirent->d_type, dirent->d_name);
 			// 1-wire devices are links beginning with 28-
 			if (dirent->d_type == DT_LNK && strstr(dirent->d_name, "28-") != NULL) {
@@ -223,7 +224,7 @@ int8_t findDevices(struct ds18b20 *d) {
 				//printf("[1wire] FindDevice(*d=devNode)      *d: %s    Temp: %.3f C    Add: 0x %x    NextAdd: 0x %x    \n", d->devID, d->tempC, d, d->next);
 			}
 		}
-
+		
 		(void) closedir(dir);
 	}
 	else {
@@ -239,15 +240,18 @@ int8_t findDevices(struct ds18b20 *d) {
 int8_t readTemp(struct ds18b20 *d) {
 	char buffer_char1[256], buffer_char2[256];
 	ssize_t numRead;
+	int fd;
 	
 	while(d->next != NULL){
 		//printf("while loop\n");
 		//printf("[1wire] readTemp(*d=rootNode)      *d: %s    Temp: %.3f C    Add: 0x %x    NextAdd: 0x %x    \n", d->devID, d->tempC, d, d->next);
 		d = d->next;
 		//printf("[1wire] readTemp(*d=rootNode)      *d: %s    Temp: %.3f C    Add: 0x %x    NextAdd: 0x %x    \n", d->devID, d->tempC, d, d->next);
-		int fd = open(d->devPath, O_RDONLY);
+		
+		fd = open(d->devPath, O_RDONLY);
+		
 		if(fd == -1) {
-			perror ("Couldn't open the w1 device.");
+			perror ("Couldn't open the w1 device.\n");
 			return 1;
 		}
 		// 1-wire driver stores data in file as long block of text
@@ -265,23 +269,11 @@ int8_t readTemp(struct ds18b20 *d) {
 			//printf("%.3f F   ", d->tempC * 9 / 5 + 32);
 			//recordTemp(d->devID, tempC);
 		}
-		//printf("closing file\n");
 		close(fd);
-		//printf("closed file\n");
 	}
-	//printf("returning from readTemp\n");
+	printf("returning from readTemp\n");
 	return 0;
 }
-
-
-
-
-
-
-
-
-
-
 
 
 // ChipCap2 Read Humidity and Temperature Sensor Data
@@ -478,9 +470,9 @@ double getPres(const int fd_bosch) {
 	Tm = (temperature + 273.15) + (0.00325 * altitude);
 	reduced_pressure = pressure * exp((9.811 * altitude) / (287.05 * Tm));
 
-	fprintf(stdout, "DEBUG: %s: temperature = %2.1f Celcius\n", FNAME, temperature);
-	fprintf(stdout, "DEBUG: %s: real pressure = %4.0f HPa\n", FNAME, pressure);
-	fprintf(stdout, "DEBUG: %s: real pressure at sea level = %4.0f HPa\n", FNAME, reduced_pressure);
+	//fprintf(stdout, "DEBUG: %s: temperature = %2.1f Celcius\n", FNAME, temperature);
+	//fprintf(stdout, "DEBUG: %s: real pressure = %4.0f HPa\n", FNAME, pressure);
+	//fprintf(stdout, "DEBUG: %s: real pressure at sea level = %4.0f HPa\n", FNAME, reduced_pressure);
 
 	/* close the I2C device */
 /*
@@ -512,7 +504,7 @@ void relays(int relay)
 
 void delivered(void *context, MQTTClient_deliveryToken dt)
 {
-    printf("[MQTT] Message with token value %d delivery confirmed\n", dt);
+    //printf("[MQTT] Message with token value %d delivery confirmed\n", dt);
     deliveredtoken = dt;
 }
 
@@ -546,7 +538,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	strcpy(buffer_msg, message->payload);
 	buffer_msg[message->payloadlen]='\0';
 	strcpy(buffer_top, topicName);
-	printf("[MQTT]   topic %s   message: %s\n",buffer_top,buffer_msg);
+	//printf("[MQTT]   topic %s   message: %s\n",buffer_top,buffer_msg);
 	
 	if(strcmp(topicName,"Home/Garage/Command")==0)
 	{	
@@ -947,7 +939,6 @@ int main (void)
 		// ****************************
 		//          CPU Temp
 		// ****************************
-
 		buffer_f=0;
 		// Read CPU Temp
 		fp = fopen ("/sys/class/thermal/thermal_zone0/temp", "r");
@@ -966,22 +957,17 @@ int main (void)
 		MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
 		//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "Home/Systems/Pi1/Temp/CPUTemp");
 
-
 		// ****************************
 		//          WIFI
 		// ****************************
-		
 		memset(&wreq, 0, sizeof(struct iwreq));
 		wreq.u.essid.length = IW_ESSID_MAX_SIZE+1;
 		sprintf(wreq.ifr_name, IW_INTERFACE);
-
 		if((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 			fprintf(stderr, "Cannot open socket \n");
 			fprintf(stderr, "errno = %d \n", errno);
 			fprintf(stderr, "Error description is : %s\n",strerror(errno));
-		} else printf("\nSocket opened successfully \n");
-
-		
+		} //else printf("\nSocket opened successfully \n");
 		memset(buffer_char, 0, sizeof(buffer_char));
 		wreq.u.essid.pointer = buffer_char;
 		wreq.u.essid.length = sizeof(buffer_char);
@@ -996,9 +982,7 @@ int main (void)
 			printf("[IOCTL] IOCTL Successfull\n");
 			printf("[IOCTL] ESSID is %s\n", (char *)wreq.u.essid.pointer);
 		}
-		
-	
-	
+
 		//make room for the iw_statistics object
 		//wreq.u.data.pointer = (struct iw_statistics *) malloc(sizeof(* wstats));
 		*/
@@ -1006,8 +990,6 @@ int main (void)
 		wreq.u.data.length = sizeof(wstats);
 		wreq.u.data.flags = 1;
 
-		
-		
 		//this will gather the signal strength
 		//if(ioctl(sockfd, SIOCGIWSTATS, &wreq) == -1){
 		if(ioctl(sockfd, SIOCGIWSTATS, &wreq) == -1){
@@ -1020,9 +1002,9 @@ int main (void)
 						
 			//buffer_u8=((iw_statistics *)wreq.u.data.pointer)->qual.level - 256;
 
-			printf("wstats.qual.qual : %d\n",wstats.qual.qual);
-			printf("wstats.qual.level : %d\n",wstats.qual.level);
-			printf("wstats.qual.noise : %d\n",wstats.qual.noise);
+			//printf("wstats.qual.qual : %d\n",wstats.qual.qual);
+			//printf("wstats.qual.level : %d\n",wstats.qual.level);
+			//printf("wstats.qual.noise : %d\n",wstats.qual.noise);
 
 			sprintf(MQTT_topic,"Home/Systems/%s/Wifi/Qual\0",hostname);
 			sprintf(buffer_char, "%d\0", wstats.qual.qual);
@@ -1052,8 +1034,9 @@ int main (void)
 			memcpy(&bitrate, &wreq.u.bitrate, sizeof(int));
 			buffer_u8=bitrate/1000000;
 		}
-			
-			
+		
+		close(sockfd);
+	
 
 		// ****************************
 		//      BAROMETRIC PRESSURE
@@ -1062,7 +1045,7 @@ int main (void)
 		buffer_lf=0;
 		// Read BMP180		
 		buffer_lf=getPres(fd_bmp180);
-		printf ("[BMP180] local Pi external pressure sensor %.3lf\n", buffer_lf);
+		//printf ("[BMP180] local Pi external pressure sensor %.3lf\n", buffer_lf);
 		sprintf(buffer_char, "%.3lf\0", buffer_lf);		
 		
 		// MQTT local bmp180 pressure sensor
@@ -1077,7 +1060,7 @@ int main (void)
 		buffer_f=0;
 		// Read ChipCap2
 		buffer_f=ChipCap2(fd_chipcap2);
-		printf ("[ChipCap2] local Pi humidity sensor pressure sensor %.3f\n", buffer_f);
+		//printf ("[ChipCap2] local Pi humidity sensor pressure sensor %.3f\n", buffer_f);
 		sprintf(buffer_char, "%.3f\0", buffer_f);		
 		
 		// MQTT local bmp180 pressure sensor
@@ -1182,13 +1165,7 @@ int main (void)
 			//printf("[1wire] MQTT publish %s from sensor %s.\n",buffer_char, devNode->devID);
 
 		}
-		
 
-		
-
-		
-
-		
 		/*
 		// Free linked list memory
 		while(rootNode) {
@@ -1262,8 +1239,8 @@ int main (void)
 		
 		//printf("[Logger] entering loop, mark_time = %d, now = %d, seconds = %d\n", mark_time.tv_sec, now.tv_sec, seconds) ; fflush (stdout) ;
 		////printf("[Logger] entering loop, mark_time = %lf, now = %lf, seconds = %lf\n", mark_time, now, seconds) ; fflush (stdout) ;
-
-		for (; seconds<10;) {
+		
+		for (; seconds<1;) {
 			gettimeofday(&now,NULL);
 			//time(&now);
 			seconds=now.tv_sec-mark_time.tv_sec;
