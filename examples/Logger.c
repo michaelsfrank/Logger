@@ -23,6 +23,60 @@
  ***********************************************************************
 
 */
+
+#if HOST == Pi1
+	#define WIFI
+	#define NRF
+	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+	#define CLIENTID    "Pi1"							// MQTT
+	//#define ONE_WIRE
+
+#elif HOST == Pi2
+	#define WIFI
+	#define NRF
+	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+	#define CLIENTID    "Pi2"							// MQTT
+	#define ONE_WIRE
+	
+
+#elif HOST == Pi3
+	#define WIFI
+	#define NRF
+	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+	#define CLIENTID    "Pi3"							// MQTT
+	#define ONE_WIRE
+	#define BMP180
+	#define CC2
+	#define RELAYS
+	#define CONTACTS
+	
+#elif HOST == Pi4
+	#define WIFI
+	#define NRF
+	#define ADDRESS     "tcp://localhost:1883"			// MQTT
+	#define CLIENTID    "Pi4"							// MQTT
+	#define ONE_WIRE
+	#define BMP180
+	#define CC2
+	#define RELAYS
+	#define CONTACTS
+	
+#else
+	#define WIFI
+	#define NRF	
+	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+	#define CLIENTID    "Default"							// MQTT
+	//#define ONE_WIRE
+	
+#endif
+
+
+#ifdef BMP180
+	#define I2C
+#elif defined CC2
+	#define I2C
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -31,44 +85,47 @@
 #include <wiringPiI2C.h> // wiringPi
 #include <MQTTClient.h> // MQTT
 //#include <MQTTClientPersistence.h> // MQTT (future)
+
+#ifdef ONE_WIRE
 #include <dirent.h>		// ds18b20 command line read
 #include <fcntl.h>		// ds18b20 command line read????
+#endif
+
 #include <inttypes.h>	// MF copied from dump.c 7-Feb-2015
 #include <unistd.h>		// MF copied from dump.c 7-Feb-2015
 
 #include <time.h>		// timing
 #include <sys/types.h> 
 
-#include <sys/ioctl.h>		// WIFI SIGNAL INFO
-#include <sys/stat.h>
-#include <sys/socket.h>		// WIFI SIGNAL INFO
-#include <linux/if.h>		// WIFI SIGNAL INFO
-//#include <linux/if_tun.h>	// WIFI SIGNAL INFO
-#include <linux/wireless.h>	// WIFI SIGNAL INFO
+#ifdef WIFI
+	#include <sys/ioctl.h>		// WIFI SIGNAL INFO
+	#include <sys/stat.h>
+	#include <sys/socket.h>		// WIFI SIGNAL INFO
+	#include <linux/if.h>		// WIFI SIGNAL INFO
+	//#include <linux/if_tun.h>	// WIFI SIGNAL INFO
+	#include <linux/wireless.h>	// WIFI SIGNAL INFO
+#endif
 
 
+#ifdef NRF
+	#include <rf24.h>		// nRF
+	#include <nRF24L01.h>	// nRF
+	#include <gpio.h>		// nRF
+	#define PAYLOAD_SIZE 8	// nRF
+#endif
 
-
-#include <rf24.h>		// nRF
-//#include <nRF24L01.h>	// nRF
-#include <gpio.h>		// nRF
-
-#include <bmp180.h>
+#ifdef BMP180
+	#include <bmp180.h>
+#endif
 
 //#include "queue.h"					// c-generic-library
 //#include "error_macros.h"				// c-generic-library
 //#include "libcgeneric/libcgeneric.h"	// c-generic-library
 
-//#include "rf24.h"		// nRF
-#include "nRF24L01.h"	// nRF
-//#include "gpio.h"		// nRF
-
-
-#define PAYLOAD_SIZE 8	// nRF
 
 #define LOCAL_DATA_INTERVAL 2	// Logger - main loop
 
-//#if HOST == Pi4
+#ifdef RELAYS
 	#define STATUS1 26
 	#define STATUS2 27
 	#define STATUS3 28
@@ -78,24 +135,7 @@
 	#define RELAY3 23
 	#define RELAY4 24
 	#define RELAY_ENABLE 25
-//#endif
-	
-#if HOST == Pi1
-	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
-	#define CLIENTID    "Pi1"							// MQTT
-#elif HOST == Pi2
-	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
-	#define CLIENTID    "Pi2"							// MQTT
-#elif HOST == Pi3
-	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
-	#define CLIENTID    "Pi3"							// MQTT
-#elif HOST == Pi4
-	#define ADDRESS     "tcp://localhost:1883"			// MQTT
-	#define CLIENTID    "Pi4"							// MQTT
-#else
-	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
-	#define CLIENTID    "Default"							// MQTT
-#endif
+#endif	
 
 #define TOPIC       "MQTT Examples"					// MQTT
 #define PAYLOAD     "Hello World!"					// MQTT
@@ -107,7 +147,7 @@
 #define _BN(x, n) ( ( (unsigned char *)(&(x)) )[(n)] )
 
 
-
+#ifdef WIFI
 /*
 // WIFI SIGNAL INFO
 // http://blog.ajhodges.com/2011/10/using-ioctl-to-gather-wifi-information.html
@@ -127,11 +167,14 @@ signalInfo_t signalInfoData;	  // MF queue
 extern int errno;
 //struct iwreq wreq;
 
+#endif
 
+/*
 int32_t intcmp(const void *, const void *,size_t);	// c-generic-library
 void  print(const void *);							// c-generic-library
 void  ckfree(void *);								// c-generic-library
 void *ckalloc(size_t);								// c-generic-library
+*/
 
 // globalCounter:
 //	Global variable to count interrupts
@@ -144,6 +187,7 @@ volatile MQTTClient_deliveryToken deliveredtoken;
 // RELAYS
 //volatile struct timeval relay_command_time; 
 
+#ifdef ONE_WIRE
 // MF queue//
 struct data_queue {
   uint8_t size;
@@ -152,9 +196,12 @@ struct data_queue {
 };					
 typedef struct data_queue data_queue_t;  // MF queue
 data_queue_t data;	  // MF queue
+#endif
 
+#ifdef NRF
 rf24_t radio_global;	// nRF
-	
+#endif
+
 /*
  * myInterrupt:
  *********************************************************************************
@@ -169,12 +216,15 @@ void myInterrupt5 (void) { ++globalCounter [5] ; }
 void myInterrupt6 (void) { ++globalCounter [6] ; }
 //void myInterrupt7 (void) { ++globalCounter [7] ; }
 
+#ifdef CC2
 // ChipCap2 global variables
 uint8_t  status;
 float humidity;
 float temperatureC;
 float temperatureF;
+#endif
 
+#ifdef ONE_WIRE
 // struct to hold ds18b20 data for linked list
 // 1-Wire driver stores info in file for device as text
 struct ds18b20 {
@@ -274,8 +324,9 @@ int8_t readTemp(struct ds18b20 *d) {
 	printf("returning from readTemp\n");
 	return 0;
 }
+#endif
 
-
+#ifdef CC2
 // ChipCap2 Read Humidity and Temperature Sensor Data
 float ChipCap2(const int fd_chipcap2)
 {
@@ -292,8 +343,9 @@ float ChipCap2(const int fd_chipcap2)
 	
 	return humidity;
 }
+#endif
 
-
+#ifdef BMP180
 // BMP180 getPres() - https://github.com/ic11b025/wetterstation/blob/master/getPres.c
 #define OSS 1 /* Oversampling_setting = 1 - > conversion time 7,5 ms */
 
@@ -483,8 +535,9 @@ double getPres(const int fd_bosch) {
 */
 	return reduced_pressure;
 }
+#endif
 
-
+#ifdef RELAYS
 void relays(int relay)
 {
 	printf("[RELAY] Relay %d activated\n", relay);
@@ -495,6 +548,9 @@ void relays(int relay)
 	digitalWrite (RELAY_ENABLE, 0);
 	printf("[RELAY] Relay %d deactivated\n", relay);
 }
+#endif
+
+
 
 /*
  *********************************************************************************
@@ -565,7 +621,7 @@ void connlost(void *context, char *cause)
 
 
 
-
+#ifdef NRF
 /*
  *********************************************************************************
  * nrf
@@ -602,8 +658,11 @@ void connlost(void *context, char *cause)
 
 	rf24_write_register(radio, 	STATUS, 	_BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );		//    CLEAR INTERRUPTS
 }
+#endif
 
 
+
+#ifdef WIFI
 /*
 
 // WIFI SIGNAL INFO
@@ -678,6 +737,7 @@ int getSignalInfo(signalInfo_t *sigInfo, char *iwname){
 
 
 */
+#endif
 
 /*
  *********************************************************************************
@@ -708,20 +768,28 @@ int main (void)
 	
 	unsigned int d[32]={0};
 	int rc;
+	
+	#ifdef BMP180
 	int fd_bmp180 = -1;	// BMP180
+	#endif
+	
+	#ifdef CC2
 	int fd_chipcap2 = -1;	// chipcap2
+	#endif
 
+	#ifdef ONE_WIRE
 	struct ds18b20 *rootNode;
 	struct ds18b20 *devNode;
 	int8_t devCnt=0;
+	#endif
 	
+	#ifdef WIFI
 	// WIFI SIGNAL INFO - TRY #2
 	int sockfd;
     struct iwreq wreq;				//	http://w1.fi/hostapd/devel/structiwreq.html
 	struct iw_statistics wstats;	//	http://w1.fi/hostapd/devel/structiw__statistics.html
-	
+	#endif
     
-	
 	// HOST
 	#if HOST == Pi1
 		strcpy(hostname,"Pi1\0");
@@ -735,7 +803,7 @@ int main (void)
 		strcpy(hostname,"unknown\0");
 	#endif
 	printf("HOST = %s\n ",hostname);
-	
+
 	//MQTT
     char MQTT_topic[256]={0};
 	MQTTClient client;
@@ -745,7 +813,6 @@ int main (void)
 	pubmsg.qos = QOS;
 	pubmsg.retained = 0;
 	deliveredtoken = 0;
-	
 
 	// MQTT Create client and connect to broker
     MQTTClient_create(&client, ADDRESS, CLIENTID, MQTTCLIENT_PERSISTENCE_NONE, NULL);
@@ -757,7 +824,6 @@ int main (void)
         printf("[MQTT] Failed to connect, return code %d\n", rc);
         // exit(-1);
     }
-
 	
 	// MQTT Subscriptions
 	//MQTTClient_subscribe(client, TOPIC, QOS);
@@ -766,27 +832,27 @@ int main (void)
 	MQTTClient_subscribe(client, "Home/Systems/Pi1/Temp/CPUTemp", QOS);
 
 	
-
-	
-
-  
 	for (pin = 0 ; pin < 8 ; ++pin) 
 		globalCounter [pin] = myCounter [pin] = 0 ;
-  
+
 	wiringPiSetup();
 	
-	//
+
+	#ifdef BMP180
 	fd_bmp180 = wiringPiI2CSetup(0x77);
 	if (fd_bmp180 == -1)
 	{
 		printf("[wiringPi] I2C setup failed for address 0x77 expected bmp180.\n");
 	}
+	#endif
 	
+	#ifdef CC2
 	fd_chipcap2 = wiringPiI2CSetup(0x28);
 	if (fd_chipcap2 == -1)
 	{
 		printf("[wiringPi] I2C setup failed for address 0x28 expected chipcap2.\n");
 	}
+	#endif
 	
 	/*
 	wiringPiISR (0, INT_EDGE_FALLING, &myInterrupt0) ; // home: open
@@ -800,6 +866,7 @@ int main (void)
 	//wiringPiISR (7, INT_EDGE_FALLING, &myInterrupt7) ; // has one wire at home
 */
 
+	#ifdef RELAYS
 	// wiringPi IO initial states
 	digitalWrite (RELAY1, 1);
 	digitalWrite (RELAY2, 1);
@@ -836,8 +903,9 @@ int main (void)
 	digitalWrite (RELAY3, 1);
 	digitalWrite (RELAY4, 1);
 	
-	
-		
+	#endif
+
+	#ifdef NRF
 	// ********* nRF *********
 	//rf24_t radio_global; // replaced with radio_global
 
@@ -850,7 +918,7 @@ int main (void)
 	rf24_write_register(&radio_global, STATUS, _BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );
 	usleep(4500);
 	gpio_write(radio_global.ce_pin, GPIO_PIN_HIGH);
-	
+	#endif
 	
 	
 	
@@ -871,6 +939,7 @@ int main (void)
 		//      MAGNETIC CONTACTS
 		// ****************************
 		
+		#ifdef CONTACTS
 		
 		if (!digitalRead(STATUS1))
 			sprintf(buffer_char,"%s","CLOSED");
@@ -922,6 +991,9 @@ int main (void)
 		}
 		*/
 		
+		#endif
+		
+		
 		/*
 		// MQTT Test Publish
 		pubmsg.payload = PAYLOAD;
@@ -957,6 +1029,7 @@ int main (void)
 		MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
 		//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "Home/Systems/Pi1/Temp/CPUTemp");
 
+		#ifdef WIFI
 		// ****************************
 		//          WIFI
 		// ****************************
@@ -1037,7 +1110,12 @@ int main (void)
 		
 		close(sockfd);
 	
-
+		#endif
+		
+		
+		
+		#ifdef BMP180
+		
 		// ****************************
 		//      BAROMETRIC PRESSURE
 		// ****************************
@@ -1052,6 +1130,11 @@ int main (void)
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
 		MQTTClient_publishMessage(client, "Home/Garage/BP", &pubmsg, &token);
+		
+		#endif
+		
+		
+		#ifdef CC2
 		
 		humidity=0;
 		temperatureC=0;
@@ -1072,12 +1155,14 @@ int main (void)
 //		temperatureC;
 //		temperatureF;
 
-
+		#endif
 
 		// ****************************
 		//          ONE WIRE
 		// ****************************
 
+		#ifdef ONE_WIRE
+		
 		rootNode = malloc( sizeof(struct ds18b20) );
 		devNode = rootNode;
 		
@@ -1237,6 +1322,9 @@ int main (void)
 		// Now free rootNode
 		free(rootNode);
 		
+		#endif
+		
+		
 		//printf("[Logger] entering loop, mark_time = %d, now = %d, seconds = %d\n", mark_time.tv_sec, now.tv_sec, seconds) ; fflush (stdout) ;
 		////printf("[Logger] entering loop, mark_time = %lf, now = %lf, seconds = %lf\n", mark_time, now, seconds) ; fflush (stdout) ;
 		
@@ -1265,6 +1353,7 @@ int main (void)
 					myCounter [pin] = globalCounter [pin] ;
 					++gotOne ;
 					switch (pin) {
+						#ifdef NRF
 						case '2':	rf24_receive(&radio_global, &data.d, 32);
 									rf24_write_register(&radio_global, 	STATUS, 	_BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );
 									for (i==0;i<32;i++)
@@ -1272,6 +1361,7 @@ int main (void)
 									fprintf(stderr, "\n");
 									
 									break;
+						#endif
 						default:	
 									
 									break;
