@@ -26,7 +26,6 @@
 
 #if HOST == Pi1
 	#define WIFI
-	#define NRF
 	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
 	#define CLIENTID    "Pi1"							// MQTT
 	//#define ONE_WIRE
@@ -187,8 +186,8 @@ volatile MQTTClient_deliveryToken deliveredtoken;
 // RELAYS
 //volatile struct timeval relay_command_time; 
 
-#ifdef ONE_WIRE
-// MF queue//
+
+// MF queue - REQUIRED FOR ONE WIRE AND NRF TEMP READING
 struct data_queue {
   uint8_t size;
   uint8_t d[32];
@@ -196,7 +195,7 @@ struct data_queue {
 };					
 typedef struct data_queue data_queue_t;  // MF queue
 data_queue_t data;	  // MF queue
-#endif
+
 
 #ifdef NRF
 rf24_t radio_global;	// nRF
@@ -595,7 +594,8 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	buffer_msg[message->payloadlen]='\0';
 	strcpy(buffer_top, topicName);
 	//printf("[MQTT]   topic %s   message: %s\n",buffer_top,buffer_msg);
-	
+
+	#ifdef RELAYS	
 	if(strcmp(topicName,"Home/Garage/Command")==0)
 	{	
 		if (strcmp(buffer_msg,"NearDoor")==0)
@@ -607,7 +607,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 		if (strcmp(buffer_msg,"MidLight")==0)
 			relays(RELAY4);
 	}
-
+	#endif
 
     MQTTClient_freeMessage(&message);
     MQTTClient_free(topicName);
