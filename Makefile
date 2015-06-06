@@ -86,7 +86,7 @@ dump: examples/dump.o
 
 # Logger with shared library
 Logger: examples/Logger.o
-	$(CC) $(CPPFLAGS) -L/usr/local/lib -lbmp180 -lnrf24 -lpaho-mqtt3c -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
+	$(CC) $(CPPFLAGS) -L/usr/local/lib -lbmp180 -lnrf24 -lpaho-mqtt3c -lsqlite3 -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
 
 # Logger previous
 #	$(CC) $(CPPFLAGS) -L/usr/local/lib -lnrf24 -lwiringPi -lwiringPiDev -lpthread -lm -o Logger $(CFLAGS) examples/Logger.o
