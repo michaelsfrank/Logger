@@ -209,15 +209,16 @@ data_queue_t data;	  // MF queue
 
 // Flag used by handler - changed to 0 when user presses Ctrl-C
 // Loop that reads & records temperatures keeps running when
-// keepRunning = 1
-int8_t volatile keepRunning = 1;
+// loop_active_main = 1
+int8_t volatile loop_active_main = 1;
+int8_t volatile loop_active_msg_thread = 1;
 
 #ifdef HANDLECTLC
 	#include <signal.h> 
 	// Called when user presses Ctrl-C
 	void intHandler() {
 		printf("\nStopping...\n");
-		keepRunning = 0;
+		loop_active_main = 0;
 	}
 #endif
 	
@@ -226,7 +227,7 @@ int8_t volatile keepRunning = 1;
 	sqlite3 *db = NULL;
 
 	// Path to DB file - same dir as this program's executable
-	char *dbPath = "../Logger_db/Logger.db";
+	char *dbPath = "Logger.db";
 
 	// DB Statement handle - used to run SQL statements
 	sqlite3_stmt *stmt = NULL;
@@ -603,15 +604,37 @@ void delivered(void *context, MQTTClient_deliveryToken dt)
 
 int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *message)
 {
+	loop_active_msg_thread=1;
+	clock_t start, end;
+	double cpu_time_used;
+	start=clock();
+	printf("loop_active_msg_thread=%d\n", loop_active_msg_thread);
 	int i;
 	double pythondatetime;	// double precision float is 8 bytes = IEEE float used in sqlite real datatype
+	time_t unixtime;
+	struct tm *loctime; 
+	int years2000;
+	int leapdays2000;
 	int rc1=1,delay_time1=10;
 	int rc2=1,delay_time2=10;
 	char* ptr;
 	char buffer_top[255], buffer_msg[255];
 	char sql[255];
-	const char token_search[2] = "/";
-	char *token;
+	const char topic_search[2] = "/";
+	char *topic_location;
+	char *topic_area;
+	char *topic_type;
+	char *topic_id;
+	FILE *fp;
+   
+	double python_datetime_leapdays_since_2000;
+	double python_datetime_2000;
+	double python_datetime_years_since_2000;
+	double python_datetime_days;
+	double python_datetime_hour;
+	double python_datetime_min;
+	double python_datetime_sec;
+   
    
     //printf("[MQTT] Message arrived, topic: %s, message: ", topicName);
 	
@@ -620,9 +643,32 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	strcpy(buffer_top, topicName);
 	
 	//printf("[MQTT]   topic %s   message: %s\n",buffer_top,buffer_msg);
+	
+	topic_location	= strtok(buffer_top, topic_search);
+	topic_area		= strtok(NULL, topic_search);
+	topic_type		= strtok(NULL, topic_search);
+	topic_id 		= strtok(NULL, topic_search);
 
-	#ifdef RELAYS	
-		if(strcmp(topicName,"Home/Garage/Command")==0)
+	printf("Topic (broken down): %s %s %s %s \n", topic_location, topic_area, topic_type, topic_id);	
+
+	//printf("string compares %d %d %d %d %d\n",strcmp(token, "Temp"),strcmp(token, "BP"),strcmp(token, "Hum"),strcmp(token, "Wifi"),strcmp(token, "Contact"));
+
+
+
+	if(strcmp(topic_type,"Temp")==0 || strcmp(topic_type,"BP")==0 || strcmp(topic_type,"Hum")==0)
+		sprintf(sql, "INSERT INTO Real(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");
+	if(strcmp(topic_type,"Wifi")==0 || strcmp(topic_type,"Contact")==0)
+		sprintf(sql, "INSERT INTO Int(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");
+	if(strcmp(topic_type,"Command")==0)
+		sprintf(sql, "INSERT INTO Text(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");	
+
+	//sprintf(sql, "INSERT INTO '%s'(Date, Val) VALUES(?, ?)", buffer_top);	
+	
+	printf("SQL statement: %s \n", sql);	
+
+
+	#ifdef RELAYS
+		if(strcmp(topic_location,"Home")==0 && strcmp(topic_area,"Garage")==0 && strcmp(topic_type,"Command")==0 && strcmp(topic_id,"Relays")==0)
 		{	
 			if (strcmp(buffer_msg,"NearDoor")==0)
 				relays(RELAY1);
@@ -638,83 +684,210 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	#ifdef SQLITE
 
 		// IN PYTHON print datetime.date(1900, 1, 1).toordinal() RETURNS 693596
+		// IN PYTHON print datetime.date(1970, 1, 1).toordinal() RETURNS 719163
+		// IN PYTHON print datetime.date(2000, 1, 1).toordinal() RETURNS 730120
 		// http://en.wikipedia.org/wiki/Unix_time
 		// Unix time number is zero at the Unix epoch, and increases by exactly 86400 per day since the epoch
-		// time_t timer;
-		pythondatetime=(double)time(NULL)/86400+693596;
+		// http://www.epochconverter.com/
+		//pythondatetime=(double)(time(NULL))/86400+719163; // conversion from Unixtime
+		//printf("pythondatetime = %lf \n", pythondatetime);
 
-		//sprintf(sql, "INSERT INTO %s(Location, Area, Type, Name, Date, Value) VALUES(?, ?, ?, ?, ?, ?)";	
-		sprintf(sql, "INSERT INTO '%s'(Date, Val) VALUES(?, ?)", buffer_top);	
+		time(&unixtime);
+		//unixtime=time(NULL);
+		//printf("unixtime = %lf \n", (double)unixtime);
 
-		token = strtok(buffer_top, token_search);
-		printf("topic token = %s      ", token);
-		token = strtok(NULL, token_search);
-		printf("topic token = %s      ", token);
-		token = strtok(NULL, token_search);
-		printf("topic token = %s      ", token);
+		loctime=localtime(&unixtime);
+		//loctime=localtime(time(NULL));
+		printf("localtime = y %d d %d h %d m %d s %d dst %d \n", loctime->tm_year, loctime->tm_yday, loctime->tm_hour, loctime->tm_min, loctime->tm_sec, loctime->tm_isdst);
+		printf("ASCII Current local time and date: %s\n", asctime(loctime));
+		
+		
+		
+		python_datetime_2000=(double)(730120);
+		python_datetime_years_since_2000=(double)(loctime->tm_year-100)*365;
+		python_datetime_days=(double)(loctime->tm_yday);
+		python_datetime_leapdays_since_2000=(float)((int)((loctime->tm_year-100)/4)); // saving to int effectivly rounds down!!!!!!!!!!!!!!!!!!!!!
+		python_datetime_hour=((double)(loctime->tm_hour))/24;
+		python_datetime_min=((double)(loctime->tm_min))/1440;
+		python_datetime_sec=((double)(loctime->tm_sec))/86400;
+		
+		printf("python_datetime_2000 : %lf\n", python_datetime_2000);
+		printf("python_datetime_years_since_2000 : %lf\n", python_datetime_years_since_2000);
+		printf("python_datetime_days : %lf\n", python_datetime_days);
+		printf("python_datetime_leapdays_since_2000 : %lf\n", python_datetime_leapdays_since_2000);
+		printf("python_datetime_hour : %lf\n", python_datetime_hour);
+		printf("python_datetime_min : %lf\n", python_datetime_min);
+		printf("python_datetime_sec : %lf\n", python_datetime_sec);
+	
+		// python datetime year 2000 = 730120, (localtime years since 1900)-100, leapdays since 2000 are int of years/4,
+		pythondatetime=1+python_datetime_2000
+						+python_datetime_years_since_2000
+						+python_datetime_days
+						+python_datetime_leapdays_since_2000
+						+python_datetime_hour
+						+python_datetime_min
+						+python_datetime_sec;
+						
+		printf("pythondatetime = %lf \n", pythondatetime);
+
+		
+
+
 
 		rc1 = sqlite3_open(dbPath, &db);
 		// If rc is not 0, there was an error
 
-		printf("string compares %d %d %d %d %d\n",strcmp(token, "Temp"),strcmp(token, "BP"),strcmp(token, "Hum"),strcmp(token, "Wifi"),strcmp(token, "Contact"));
 		
+		
+
+		/*** OPEN DATABASE ***/
 		if(rc1){
 			printf("Can't open database: %s. Missed value from %s\n", sqlite3_errmsg(db),topicName);
 		}else{
 			printf("Database opened: %s. Writing value from %s...\n", sqlite3_errmsg(db),topicName);
-				
+		
 			rc2=sqlite3_prepare_v2(db, sql, strlen(sql), &stmt, NULL);
 			if (rc2)
-				printf("prepare return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+				printf("prepare return code %d: %s\n\n", rc2, sqlite3_errmsg(db));			
 			
-			if((strcmp(token, "Temp")==0)||(strcmp(token, "BP")==0)||(strcmp(token, "Hum")==0))
+			
+			/*** BIND TOPIC ***/
+			rc2=sqlite3_bind_text(stmt, 1, topic_location, strlen(topic_location), 0);
+				if (rc2)
+					printf("bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+
+			rc2=sqlite3_bind_text(stmt, 2, topic_area, strlen(topic_area), 0);
+				if (rc2)
+					printf("bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+
+			rc2=sqlite3_bind_text(stmt, 3, topic_type, strlen(topic_type), 0);
+				if (rc2)
+					printf("bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+
+			rc2=sqlite3_bind_text(stmt, 4, topic_id, strlen(topic_id), 0);
+				if (rc2)
+					printf("bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+
+
+			/*** BIND DATE ***/
+			rc2=sqlite3_bind_double(stmt, 5, pythondatetime);
+			if (rc2)
+				printf("bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+
+
+
+			/*** BIND VALUE ***/
+			if((strcmp(topic_type, "Temp")==0)||(strcmp(topic_type, "BP")==0)||(strcmp(topic_type, "Hum")==0))
 			{
-				rc2=sqlite3_bind_double(stmt, 2, atof(buffer_msg));
-				
-				//if (rc2)
-					printf("bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+
+				rc2=sqlite3_bind_double(stmt, 6, atof(buffer_msg));
+				if (rc2)
+					printf("bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));	
 			}
-			/*
-			if((strcmp(token, "Wifi")==0)||(strcmp(token, "Contact")==0));
+			
+			if( (strcmp(topic_type, "Wifi")==0) || (strcmp(topic_type, "Contact")==0) )
 			{
-				rc2=sqlite3_bind_int(stmt, 2, atoi(buffer_msg));
-				//if (rc2)
+
+				rc2=sqlite3_bind_int(stmt, 6, atoi(buffer_msg));
+				if (rc2)
 					printf("bind int return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 			}
-			*/
-			if((strcmp(token, "Command")==0))
+					
+			if((strcmp(topic_type, "Command")==0))
+			{
+				rc2=sqlite3_bind_text(stmt, 6, buffer_msg, strlen(buffer_msg), 0);
+				if (rc2)
+					printf("bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+			}
+			
+
+			/*** SQL COMMANDS ***/
+			rc2=sqlite3_step(stmt);  // Run SQL INSERT
+			if (rc2)
+				printf("step return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+			
+			rc2=sqlite3_reset(stmt); // Clear statement handle for next use
+			if (rc2)
+				printf("reset return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+		
+			rc2=sqlite3_finalize(stmt);
+			if (rc2)
+				printf("finalize return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+
+
+		/* ORIGINAL BINDING
+		if(rc1){
+			printf("Can't open database: %s. Missed value from %s\n", sqlite3_errmsg(db),topicName);
+		}else{
+			printf("Database opened: %s. Writing value from %s...\n", sqlite3_errmsg(db),topicName);
+		
+			rc2=sqlite3_prepare_v2(db, sql, strlen(sql), &stmt, NULL);
+			if (rc2)
+				printf("prepare return code %d: %s\n\n", rc2, sqlite3_errmsg(db));			
+			
+			rc2=sqlite3_bind_double(stmt, 1, pythondatetime);
+			if (rc2)
+				printf("bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+			
+			if((strcmp(topic_type, "Temp")==0)||(strcmp(token, "BP")==0)||(strcmp(token, "Hum")==0))
+			{
+
+				rc2=sqlite3_bind_double(stmt, 2, atof(buffer_msg));
+				if (rc2)
+					printf("bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));	
+			}
+			
+			if( (strcmp(topic_type, "Wifi")==0) || (strcmp(token, "Contact")==0) )
+			{
+
+				rc2=sqlite3_bind_int(stmt, 2, atoi(buffer_msg));
+				if (rc2)
+					printf("bind int return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+			}
+			
+			if((strcmp(topic_type, "Command")==0))
 			{
 				rc2=sqlite3_bind_text(stmt, 2, buffer_msg, strlen(buffer_msg), 0);
-				//if (rc2)
+				if (rc2)
 					printf("bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 			}
 			
 			rc2=sqlite3_step(stmt);  // Run SQL INSERT
-			//if (rc2)
+			if (rc2)
 				printf("step return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 			
 			rc2=sqlite3_reset(stmt); // Clear statement handle for next use
-			//if (rc2)
+			if (rc2)
 				printf("reset return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 		
 			rc2=sqlite3_finalize(stmt);
-			//if (rc2)
+			if (rc2)
+				printf("finalize return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+			*/
+
+			/*
+			rc2=sqlite3_finalize(stmt);
+			if (rc2)
 				printf("finalize return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 			
 			for(rc2=1,delay_time2=10;rc2&&delay_time2<1000;delay_time2+=100)
 			{
-//Can't close database: unable to close due to unfinalised statements.
+
+
 				rc2 = sqlite3_close(db);
 				// If rc is not 0, there was an error
 				if(rc2){
 					printf("Can't close database: %s. Delaying %dms...\n", sqlite3_errmsg(db),delay_time2);
-					delay(delay_time2); /* 100ms more delay each loop */
+					// Can't close database: unable to close due to unfinalised statements. -> SOLVED by sqlite3_finalize(stmt);
+					delay(delay_time2); // 100ms more delay each loop
 				}else{
 					printf("Database closed: %s\n", sqlite3_errmsg(db));
-				}
+// TO DO: Database closed: library routine called out of sequence -> UNSOLVED
+					}
 				
 				
 			}
+		*/	
 		}
 	
 	#endif
@@ -722,7 +895,15 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	
     MQTTClient_freeMessage(&message);
     MQTTClient_free(topicName);
-    return 1;
+    loop_active_msg_thread=0;
+	printf("loop_active_msg_thread=%d\n", loop_active_msg_thread);
+	end=clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	printf("start %d, end %d, CPU time %f\n", start, end, cpu_time_used);
+	fp = fopen ("Logger_msgarrvd.txt", "a");
+	fprintf(fp, "%f\n",cpu_time_used);
+	fclose(fp);
+	return 1;
 }
 
 void connlost(void *context, char *cause)
@@ -773,90 +954,13 @@ void connlost(void *context, char *cause)
 
 
 
-#ifdef WIFI
-	/*
-
-	// WIFI SIGNAL INFO
-	// http://blog.ajhodges.com/2011/10/using-ioctl-to-gather-wifi-information.html
-	int getSignalInfo(signalInfo_t *sigInfo, char *iwname){
-		iwreq req;
-		strcpy(req.ifr_name, iwname);
-		struct iw_statistics *stats;
-	 
-		//have to use a socket for ioctl
-		int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	 
-		//make room for the iw_statistics object
-		req.u.data.pointer = (struct iw_statistics *) malloc(sizeof(* stats));
-		req.u.data.length = sizeof(* stats);
-		req.u.data.flags = 1;
-
-		//this will gather the signal strength
-		if(ioctl(sockfd, SIOCGIWSTATS, &req) == -1){
-			//die with error, invalid interface
-			fprintf(stderr, "Invalid interface.\n");
-			return(-1);
-		}
-		else if(((iw_statistics *)req.u.data.pointer)->qual.updated & IW_QUAL_DBM){
-			//signal is measured in dBm and is valid for us to use
-			sigInfo->level=((iw_statistics *)req.u.data.pointer)->qual.level - 256;
-		}
-	 
-		//SIOCGIWESSID for ssid
-		char buffer[32];
-		memset(buffer, 0, 32);
-		req.u.essid.pointer = buffer;
-		req.u.essid.length = 32;
-		//this will gather the SSID of the connected network
-		if(ioctl(sockfd, SIOCGIWESSID, &req) == -1){
-			//die with error, invalid interface
-			return(-1);
-		}
-		else{
-			memcpy(&sigInfo->ssid, req.u.essid.pointer, req.u.essid.length);
-			memset(&sigInfo->ssid[req.u.essid.length],0,1);
-		}
-	 
-		//SIOCGIWRATE for bits/sec (convert to mbit)
-		int bitrate=-1;
-		//this will get the bitrate of the link
-		if(ioctl(sockfd, SIOCGIWRATE, &req) == -1){
-			fprintf(stderr, "bitratefail");
-			return(-1);
-		}else{
-			memcpy(&bitrate, &req.u.bitrate, sizeof(int));
-			sigInfo->bitrate=bitrate/1000000;
-		}
-	 
-	 
-		//SIOCGIFHWADDR for mac addr
-		ifreq req2;
-		strcpy(req2.ifr_name, iwname);
-		//this will get the mac address of the interface
-		if(ioctl(sockfd, SIOCGIFHWADDR, &req2) == -1){
-			fprintf(stderr, "mac error");
-			return(-1);
-		}
-		else{
-			sprintf(sigInfo->mac, "%.2X", (unsigned char)req2.ifr_hwaddr.sa_data[0]);
-			for(int s=1; s<6; s++){
-				sprintf(sigInfo->mac+strlen(sigInfo->mac), ":%.2X", (unsigned char)req2.ifr_hwaddr.sa_data[s]);
-			}
-		}
-		close(sockfd);
-	}
-
-
-	*/
-#endif
-
 /*
  *********************************************************************************
  * main
  *********************************************************************************
  */
 
-int main (void)
+int main(void)
 {
 	char hostname[20]={0};
 	int gotOne, pin ;	// isr
@@ -869,7 +973,7 @@ int main (void)
 	//unsigned int t=0;			// time
 	//QueueList  object;	// c-generic-library
 	//data_queue_t data;	// c-generic-library
-
+	int delay_time2;
 
 	#ifdef HANDLECTLC
 		signal(SIGINT, intHandler);
@@ -942,21 +1046,20 @@ int main (void)
         // exit(-1);
     }
 	
-	
 	//MQTTClient_subscribe(client, "+", QOS);
 
 	// MQTT Subscriptions - this is a crashing MQTT client!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	//  [MQTT] Connection lost, cause: (null)
 	#ifdef SQLITE
 		
-		MQTTClient_subscribe(client, "Home/Garage/Temp", QOS);
-		MQTTClient_subscribe(client, "Home/Garage/BP", QOS);
-		MQTTClient_subscribe(client, "Home/Garage/Hum", QOS);
+		MQTTClient_subscribe(client, "Home/Garage/Temp/001", QOS);
+		MQTTClient_subscribe(client, "Home/Garage/BP/001", QOS);
+		MQTTClient_subscribe(client, "Home/Garage/Hum/001", QOS);
 		MQTTClient_subscribe(client, "Home/Garage/Contact/DoorSide", QOS);
 		MQTTClient_subscribe(client, "Home/Garage/Contact/DoorNear", QOS);
 		MQTTClient_subscribe(client, "Home/Garage/Contact/DoorMid", QOS);
 		MQTTClient_subscribe(client, "Home/Garage/Contact/DoorFar", QOS);
-		MQTTClient_subscribe(client, "Home/Outside/Temp", QOS);
+		MQTTClient_subscribe(client, "Home/Outside/Temp/001", QOS);
 		MQTTClient_subscribe(client, "Systems/Pi1/Temp/CPUTemp", QOS);
 		MQTTClient_subscribe(client, "Systems/Pi1/Wifi/Qual", QOS);
 		MQTTClient_subscribe(client, "Systems/Pi1/Wifi/Level", QOS);
@@ -977,9 +1080,13 @@ int main (void)
 		MQTTClient_subscribe(client, "Systems/Pi4/Wifi/Qual", QOS);
 		MQTTClient_subscribe(client, "Systems/Pi4/Wifi/Level", QOS);
 		MQTTClient_subscribe(client, "Systems/Pi4/Wifi/Noise", QOS);
-		
-		MQTTClient_subscribe(client, "Home/Garage/Command", QOS);
-		
+		MQTTClient_subscribe(client, "Home/Garage/Command/Relays", QOS);
+	
+		rc = sqlite3_open(dbPath, &db);
+		// If rc is not 0, there was an error
+		if(rc)
+			printf("Can't open database: %s\n", sqlite3_errmsg(db));
+	
 	#endif
 
 
@@ -1071,10 +1178,10 @@ int main (void)
 	usleep(4500);
 	gpio_write(radio_global.ce_pin, GPIO_PIN_HIGH);
 	#endif
-	
-	
-	
-	while (keepRunning)
+
+
+
+	while (loop_active_main)
 	{
 		gotOne = 0 ;
 
@@ -1089,67 +1196,28 @@ int main (void)
 		// ****************************
 		//      MAGNETIC CONTACTS
 		// ****************************
-		
+
 		#ifdef CONTACTS
-		/*
-		printf("=======================\n");
-		if (!digitalRead(STATUS1))
-			sprintf(buffer_char,"%d",0);
-		else
-			sprintf(buffer_char,"%d",1);
-		printf("=======================\n");
+
+		sprintf(buffer_char,"%d",!digitalRead(STATUS1));
 		pubmsg.payload = buffer_char;
-		printf("=======================\n");
 		pubmsg.payloadlen = strlen(buffer_char);
-		printf("=======================\n");
 		MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorSide", &pubmsg, &token);
-		printf("=======================\n");
-		*/
-		if (!digitalRead(STATUS2))
-			sprintf(buffer_char,"%s","CLOSED");
-		else
-			sprintf(buffer_char,"%s","OPEN");
+
+		sprintf(buffer_char,"%d",!digitalRead(STATUS2));
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
-		printf("MQTT sub %d\n",MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorNear", &pubmsg, &token));
-		
-		printf("=======================\n");
-		
-		if (!digitalRead(STATUS3))
-			sprintf(buffer_char,"%s","CLOSED");
-		else
-			sprintf(buffer_char,"%s","OPEN");
+		MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorNear", &pubmsg, &token);
+
+		sprintf(buffer_char,"%d",!digitalRead(STATUS3));
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
-		printf("MQTT sub %d\n",MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorMid", &pubmsg, &token));
-		
-		if (!digitalRead(STATUS4))
-			sprintf(buffer_char,"%s","CLOSED");
-		else
-			sprintf(buffer_char,"%s","OPEN");
+		MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorMid", &pubmsg, &token);
+
+		sprintf(buffer_char,"%d",!digitalRead(STATUS4));
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
-		printf("MQTT sub %d\n",MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorFar", &pubmsg, &token));
-		
-		
-		/*
-		IF(digitalRead(STATUS2)) {
-			pubmsg.payload = buffer_char;
-			pubmsg.payloadlen = strlen(buffer_char);
-			MQTTClient_publishMessage(client, "Home/Garage/Status/Door/Near", &pubmsg, &token);
-		}
-		IF(digitalRead(STATUS3)) {
-			pubmsg.payload = buffer_char;
-			pubmsg.payloadlen = strlen(buffer_char);
-			MQTTClient_publishMessage(client, "Home/Garage/Status/Door/Mid", &pubmsg, &token);
-		}
-		
-		IF(digitalRead(STATUS4)) {
-			pubmsg.payload = buffer_char;
-			pubmsg.payloadlen = strlen(buffer_char);
-			MQTTClient_publishMessage(client, "Home/Garage/Status/Door/Far", &pubmsg, &token);
-		}
-		*/
+		MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorFar", &pubmsg, &token);
 		
 		#endif
 		
@@ -1166,13 +1234,12 @@ int main (void)
 		//if(deliveredtoken != token)
 		//	printf("[MQTT] Still not delivered\n");
 		*/
-printf("=======================\n");
 
 		// ****************************
 		//          CPU Temp
 		// ****************************
-		buffer_f=0;
 		// Read CPU Temp
+		buffer_f=0;
 		fp = fopen ("/sys/class/thermal/thermal_zone0/temp", "r");
 		if (fp == NULL)
 			printf("[Logger] Unable to open file.\n");
@@ -1181,14 +1248,14 @@ printf("=======================\n");
 		//printf ("[Logger] local Pi CPU temp is %.3f C.\n", buffer_lf);
 		fclose (fp);
 		sprintf(buffer_char, "%.3f\0", buffer_lf);
-printf("=======================\n");
+
 		// MQTT local Pi CPU temp
 		sprintf(MQTT_topic,"Systems/%s/Temp/CPUTemp\0",hostname);
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
 		MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
 		//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "Systems/Pi1/Temp/CPUTemp");
-printf("=======================\n");
+
 		#ifdef WIFI
 		// ****************************
 		//          WIFI
@@ -1537,5 +1604,21 @@ printf("=======================\n");
 		
 	}
 
+	while(loop_active_msg_thread) {}
+	
+	for(rc=1,delay_time2=100;rc=1&&delay_time2<1000;delay_time2+=100)
+	{
+		rc = sqlite3_close(db);
+		// If rc is not 0, there was an error
+		if(rc){
+			printf("Can't close database, return code $d: %s. Delaying %dms...\n", rc, sqlite3_errmsg(db),delay_time2);
+			// Can't close database: unable to close due to unfinalised statements. -> SOLVED by sqlite3_finalize(stmt);
+			delay(delay_time2); // 100ms more delay each loop
+		}else{
+			printf("Database closed, return code %d: %s\n", rc, sqlite3_errmsg(db));
+// TO DO: 
+		}
+	}
+	
 	return 0 ;
 }

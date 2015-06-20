@@ -1,6 +1,5 @@
 TODO
 
-fix Pushetta Notifcations
-
-FISH ON!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-curl: (3) [globbing] unmatched close brace/bracket at pos 34
+database fails to open after a while
+error code ___
+then exits
