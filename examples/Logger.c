@@ -320,15 +320,15 @@ void myInterrupt6 (void) { ++globalCounter [6] ; }
 		char buffer_char1[256], buffer_char2[256];
 		ssize_t numRead;
 		int fd;
-		
+
 		while(d->next != NULL){
 			//printf("while loop\n");
 			//printf("[1wire] readTemp(*d=rootNode)      *d: %s    Temp: %.3f C    Add: 0x %x    NextAdd: 0x %x    \n", d->devID, d->tempC, d, d->next);
 			d = d->next;
 			//printf("[1wire] readTemp(*d=rootNode)      *d: %s    Temp: %.3f C    Add: 0x %x    NextAdd: 0x %x    \n", d->devID, d->tempC, d, d->next);
-			
+
 			fd = open(d->devPath, O_RDONLY);
-			
+
 			if(fd == -1) {
 				perror ("Couldn't open the w1 device.\n");
 				return 1;
@@ -668,16 +668,30 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 
 
 	#ifdef RELAYS
-		if(strcmp(topic_location,"Home")==0 && strcmp(topic_area,"Garage")==0 && strcmp(topic_type,"Command")==0 && strcmp(topic_id,"Relays")==0)
-		{	
-			if (strcmp(buffer_msg,"NearDoor")==0)
-				relays(RELAY1);
-			if (strcmp(buffer_msg,"MidDoor")==0)
-				relays(RELAY2);
-			if (strcmp(buffer_msg,"NearLight")==0)
-				relays(RELAY3);
-			if (strcmp(buffer_msg,"MidLight")==0)
-				relays(RELAY4);
+		if(strcmp(topic_type,"Command")==0 && strcmp(topic_id,"Relays")==0)
+		{
+			if(strcmp(topic_location,"Home")==0 && strcmp(topic_area,"Garage")==0)
+			{	
+				if (strcmp(buffer_msg,"NearDoor")==0)
+					relays(RELAY1);
+				if (strcmp(buffer_msg,"MidDoor")==0)
+					relays(RELAY2);
+				if (strcmp(buffer_msg,"NearLight")==0)
+					relays(RELAY3);
+				if (strcmp(buffer_msg,"MidLight")==0)
+					relays(RELAY4);
+			}
+			else if(strcmp(topic_location,"Home")==0 && strcmp(topic_area,"Mike")==0)
+			{
+				if (strcmp(buffer_msg,"RELAY1")==0)
+					relays(RELAY1);
+				if (strcmp(buffer_msg,"RELAY2")==0)
+					relays(RELAY2);
+				if (strcmp(buffer_msg,"RELAY3")==0)
+					relays(RELAY3);
+				if (strcmp(buffer_msg,"RELAY4")==0)
+					relays(RELAY4);
+			}
 		}
 	#endif
 
@@ -710,7 +724,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 		python_datetime_hour=((double)(loctime->tm_hour))/24;
 		python_datetime_min=((double)(loctime->tm_min))/1440;
 		python_datetime_sec=((double)(loctime->tm_sec))/86400;
-		
+/*		
 		printf("python_datetime_2000 : %lf\n", python_datetime_2000);
 		printf("python_datetime_years_since_2000 : %lf\n", python_datetime_years_since_2000);
 		printf("python_datetime_days : %lf\n", python_datetime_days);
@@ -718,7 +732,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 		printf("python_datetime_hour : %lf\n", python_datetime_hour);
 		printf("python_datetime_min : %lf\n", python_datetime_min);
 		printf("python_datetime_sec : %lf\n", python_datetime_sec);
-	
+*/	
 		// python datetime year 2000 = 730120, (localtime years since 1900)-100, leapdays since 2000 are int of years/4,
 		pythondatetime=1+python_datetime_2000
 						+python_datetime_years_since_2000
@@ -728,7 +742,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 						+python_datetime_min
 						+python_datetime_sec;
 						
-		printf("pythondatetime = %lf \n", pythondatetime);
+		// printf("pythondatetime = %lf \n", pythondatetime);
 
 		
 
@@ -744,7 +758,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 		if(rc1){
 			printf("Can't open database: %s. Missed value from %s\n", sqlite3_errmsg(db),topicName);
 		}else{
-			printf("Database opened: %s. Writing value from %s...\n", sqlite3_errmsg(db),topicName);
+			// printf("Database opened: %s. Writing value from %s...\n", sqlite3_errmsg(db),topicName);
 		
 			rc2=sqlite3_prepare_v2(db, sql, strlen(sql), &stmt, NULL);
 			if (rc2)
@@ -803,7 +817,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 
 			/*** SQL COMMANDS ***/
 			rc2=sqlite3_step(stmt);  // Run SQL INSERT
-			if (rc2)
+			if (rc2 && (rc2 != 101))
 				printf("step return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 			
 			rc2=sqlite3_reset(stmt); // Clear statement handle for next use
@@ -1052,6 +1066,10 @@ int main(void)
 	//  [MQTT] Connection lost, cause: (null)
 	#ifdef SQLITE
 		
+		MQTTClient_subscribe(client, "Home/#", QOS);
+		MQTTClient_subscribe(client, "Systems/#", QOS);
+
+/*
 		MQTTClient_subscribe(client, "Home/Garage/Temp/001", QOS);
 		MQTTClient_subscribe(client, "Home/Garage/BP/001", QOS);
 		MQTTClient_subscribe(client, "Home/Garage/Hum/001", QOS);
@@ -1081,7 +1099,7 @@ int main(void)
 		MQTTClient_subscribe(client, "Systems/Pi4/Wifi/Level", QOS);
 		MQTTClient_subscribe(client, "Systems/Pi4/Wifi/Noise", QOS);
 		MQTTClient_subscribe(client, "Home/Garage/Command/Relays", QOS);
-	
+*/	
 		rc = sqlite3_open(dbPath, &db);
 		// If rc is not 0, there was an error
 		if(rc)
@@ -1197,8 +1215,15 @@ int main(void)
 		//      MAGNETIC CONTACTS
 		// ****************************
 
-		#ifdef CONTACTS
+#ifdef CONTACTS
 
+#if HOST == Pi1
+
+
+#elif HOST == Pi2
+
+
+#elif HOST == Pi3
 		sprintf(buffer_char,"%d",!digitalRead(STATUS1));
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
@@ -1219,7 +1244,32 @@ int main(void)
 		pubmsg.payloadlen = strlen(buffer_char);
 		MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorFar", &pubmsg, &token);
 		
-		#endif
+
+#elif HOST == Pi4
+		sprintf(buffer_char,"%d",!digitalRead(STATUS1));
+		pubmsg.payload = buffer_char;
+		pubmsg.payloadlen = strlen(buffer_char);
+		MQTTClient_publishMessage(client, "Home/Mike/Contact/001", &pubmsg, &token);
+
+		sprintf(buffer_char,"%d",!digitalRead(STATUS2));
+		pubmsg.payload = buffer_char;
+		pubmsg.payloadlen = strlen(buffer_char);
+		MQTTClient_publishMessage(client, "Home/Mike/Contact/002", &pubmsg, &token);
+
+		sprintf(buffer_char,"%d",!digitalRead(STATUS3));
+		pubmsg.payload = buffer_char;
+		pubmsg.payloadlen = strlen(buffer_char);
+		MQTTClient_publishMessage(client, "Home/Mike/Contact/003", &pubmsg, &token);
+
+		sprintf(buffer_char,"%d",!digitalRead(STATUS4));
+		pubmsg.payload = buffer_char;
+		pubmsg.payloadlen = strlen(buffer_char);
+		MQTTClient_publishMessage(client, "Home/Mike/Contact/004", &pubmsg, &token);
+		
+
+#endif
+
+#endif
 		
 		
 		/*
@@ -1356,8 +1406,13 @@ int main(void)
 		// MQTT local bmp180 pressure sensor
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
-		MQTTClient_publishMessage(client, "Home/Garage/BP", &pubmsg, &token);
-		
+#if HOST == Pi2
+		MQTTClient_publishMessage(client, "Cottage/Mike/BP/001", &pubmsg, &token);
+#elif HOST == Pi3
+		MQTTClient_publishMessage(client, "Home/Garage/BP/001", &pubmsg, &token);
+#elif HOST == Pi4
+		MQTTClient_publishMessage(client, "Home/Mike/BP/001", &pubmsg, &token);
+#endif		
 		#endif
 		
 		
@@ -1376,7 +1431,15 @@ int main(void)
 		// MQTT local bmp180 pressure sensor
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
-		MQTTClient_publishMessage(client, "Home/Garage/Hum", &pubmsg, &token);
+#if HOST == Pi1
+		MQTTClient_publishMessage(client, "Cottage/Mike/Hum/001", &pubmsg, &token);
+#elif HOST == Pi2
+		MQTTClient_publishMessage(client, "Home/Garage/Hum/001", &pubmsg, &token);
+#elif HOST == Pi3
+		MQTTClient_publishMessage(client, "Home/Garage/Hum/001", &pubmsg, &token);
+#elif HOST == Pi4
+		MQTTClient_publishMessage(client, "Home/Mike/Hum/001", &pubmsg, &token);
+#endif
 		
 //		humidity;
 //		temperatureC;
@@ -1462,15 +1525,15 @@ int main(void)
 			else if (!strcmp(devNode->devID, "28-031467a707ff"))
 				MQTTClient_publishMessage(client, "Systems/Pi3/Temp/Wifi", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-04146cd4e5ff"))
-				MQTTClient_publishMessage(client, "Home/Garage/Temp", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Home/Garage/Temp/001", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-04146cf597ff"))
-				MQTTClient_publishMessage(client, "Home/Outside/Temp", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Home/Outside/Temp/001", &pubmsg, &token);
 #endif
 #if HOST == Pi4
 			if (!strcmp(devNode->devID, "28-04146c93f6ff"))
-				MQTTClient_publishMessage(client, "Systems/Pi4/Temp/Temp1", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Home/Mike/Temp/001", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-04146d1220ff"))
-				MQTTClient_publishMessage(client, "Systems/Pi4/Temp/Temp2", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Home/Mike/Temp/002", &pubmsg, &token);
 #endif
 
 			//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "...");
