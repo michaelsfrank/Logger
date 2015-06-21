@@ -1555,7 +1555,7 @@ int main(void)
 		//printf("[Logger] entering loop, mark_time = %d, now = %d, seconds = %d\n", mark_time.tv_sec, now.tv_sec, seconds) ; fflush (stdout) ;
 		////printf("[Logger] entering loop, mark_time = %lf, now = %lf, seconds = %lf\n", mark_time, now, seconds) ; fflush (stdout) ;
 		
-		for (; seconds<1;) {
+		for (; seconds<10;) {
 			gettimeofday(&now,NULL);
 			//time(&now);
 			seconds=now.tv_sec-mark_time.tv_sec;
@@ -1604,8 +1604,11 @@ int main(void)
 		
 	}
 
+
+
 	while(loop_active_msg_thread) {}
 	
+#ifdef SQLITE
 	for(rc=1,delay_time2=100;rc=1&&delay_time2<1000;delay_time2+=100)
 	{
 		rc = sqlite3_close(db);
@@ -1619,6 +1622,7 @@ int main(void)
 // TO DO: 
 		}
 	}
+#endif
 	
 	return 0 ;
 }
