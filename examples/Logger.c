@@ -1508,16 +1508,20 @@ int main(void)
 				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor2", &pubmsg, &token);
 #endif
 #if HOST == Pi2
-			if (!strcmp(devNode->devID, "28-000005eaf6c1"))
-				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Ceiling1", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-000005e99b06"))
-				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Ceiling2", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-000005eb03de"))
-				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Mid1", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-000005eb5b13"))
-				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor1", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-000005ea416a"))
-				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor2", &pubmsg, &token);
+			if (!strcmp(devNode->devID, "28-0000007c750d"))
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp1", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-0000015dd661"))
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp2", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-000005e50d0a"))
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp3", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-000005e9a47f"))
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp4", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-000005e9e919"))
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp5", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-000005ea9920"))
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp5", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-000005eac141"))
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp5", &pubmsg, &token);
 #endif
 #if HOST == Pi3
 			if (!strcmp(devNode->devID, "28-04146d2647ff"))
