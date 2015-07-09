@@ -26,7 +26,8 @@
 
 #if HOST == Pi1
 	#define WIFI
-	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+//	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
+	#define ADDRESS     "tcp://frafle.ddns.net:22883"		// MQTT
 	#define CLIENTID    "Pi1"							// MQTT
 	//#define ONE_WIRE
 
