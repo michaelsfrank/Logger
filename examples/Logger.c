@@ -272,14 +272,14 @@ int8_t volatile loop_active_msg_thread = 1;
  *********************************************************************************
  */
 
-void myInterrupt0 (void) { ++globalCounter [0] ; }
-void myInterrupt1 (void) { ++globalCounter [1] ; }
-void myInterrupt2 (void) { ++globalCounter [2] ; }	  // nRF
-void myInterrupt3 (void) { ++globalCounter [3] ; }
-void myInterrupt4 (void) { ++globalCounter [4] ; }
-void myInterrupt5 (void) { ++globalCounter [5] ; }
-void myInterrupt6 (void) { ++globalCounter [6] ; }
-//void myInterrupt7 (void) { ++globalCounter [7] ; }
+void myInterrupt0 (void) { ++globalCounter [0]; }
+void myInterrupt1 (void) { ++globalCounter [1]; }
+void myInterrupt2 (void) { ++globalCounter [2]; printf("[WiringPi] Interrupt 2\n"); }	  // nRF
+void myInterrupt3 (void) { ++globalCounter [3]; }
+void myInterrupt4 (void) { ++globalCounter [4]; }
+void myInterrupt5 (void) { ++globalCounter [5]; }
+void myInterrupt6 (void) { ++globalCounter [6]; }
+//void myInterrupt7 (void) { ++globalCounter [7]; }
 
 #ifdef CC2
 	// ChipCap2 global variables
@@ -1219,10 +1219,6 @@ int main(void)
 	#endif
 
 
-	for (pin = 0 ; pin < 8 ; ++pin) 
-		globalCounter [pin] = myCounter [pin] = 0 ;
-
-	wiringPiSetup();
 	
 
 
@@ -1241,8 +1237,14 @@ int main(void)
 		printf("[wiringPi] I2C setup failed for address 0x28 expected chipcap2.\n");
 	}
 	#endif
-	
-	/*
+
+	for (pin = 0 ; pin < 8 ; ++pin) 
+		globalCounter [pin] = myCounter [pin] = 0 ;
+
+	wiringPiSetup();
+
+	wiringPiISR (11, INT_EDGE_FALLING, &myInterrupt2) ; // nRF hardware interrupt - Pi1/2/3/4 
+/*
 	wiringPiISR (0, INT_EDGE_FALLING, &myInterrupt0) ; // home: open
 	wiringPiISR (1, INT_EDGE_FALLING, &myInterrupt1) ; // home: open
 	wiringPiISR (2, INT_EDGE_FALLING, &myInterrupt2) ; // home: nRF hardware interrupt
