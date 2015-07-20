@@ -1380,9 +1380,9 @@ int main(void)
 		}
 		else {
 		//else if(((iw_statistics *)wreq.u.data.pointer)->qual.updated & IW_QUAL_DBM){
-			
+
 			sprintf(MQTT_topic,"Systems/%s/Wifi/Level\0",hostname);
-						
+
 			//buffer_u8=((iw_statistics *)wreq.u.data.pointer)->qual.level - 256;
 
 			//printf("wstats.qual.qual : %d\n",wstats.qual.qual);
@@ -1394,13 +1394,13 @@ int main(void)
 			pubmsg.payload = buffer_char;
 			pubmsg.payloadlen = strlen(buffer_char);
 			MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
-			
+
 			sprintf(MQTT_topic,"Systems/%s/Wifi/Level",hostname);
 			sprintf(buffer_char, "%d\0", wstats.qual.level);
 			pubmsg.payload = buffer_char;
 			pubmsg.payloadlen = strlen(buffer_char);
 			MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
-			
+
 			sprintf(MQTT_topic,"Systems/%s/Wifi/Noise\0",hostname);
 			sprintf(buffer_char, "%d\0", wstats.qual.noise);
 			pubmsg.payload = buffer_char;
@@ -1417,38 +1417,38 @@ int main(void)
 			memcpy(&bitrate, &wreq.u.bitrate, sizeof(int));
 			buffer_u8=bitrate/1000000;
 		}
-		
+
 		close(sockfd);
-	
+
 #endif
-		
-		
-		
+
 #ifdef BMP180
-		
+
 		// ****************************
 		//      BAROMETRIC PRESSURE
 		// ****************************
-		
+
 		buffer_lf=0;
-		// Read BMP180		
+		// Read BMP180
 		buffer_lf=getPres(fd_bmp180);
 		printf ("[BMP180] local Pi external pressure sensor %.3lf\n", buffer_lf);
-		sprintf(buffer_char, "%.3lf\0", buffer_lf);		
-		
+		sprintf(buffer_char, "%.3lf\0", buffer_lf);
+
 		// MQTT local bmp180 pressure sensor
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
-#if HOST == Pi2
+
+#if HOST == Pi1
 		MQTTClient_publishMessage(client, "Cottage/Mike/BP/001", &pubmsg, &token);
+#elif HOST == Pi2
+		MQTTClient_publishMessage(client, "Cottage/Mike/BP/002", &pubmsg, &token);
 #elif HOST == Pi3
 		MQTTClient_publishMessage(client, "Home/Garage/BP/001", &pubmsg, &token);
 #elif HOST == Pi4
 		MQTTClient_publishMessage(client, "Home/Mike/BP/001", &pubmsg, &token);
-#endif		
 #endif
-		
-		
+#endif
+
 #ifdef CC2
 		
 		humidity=0;
