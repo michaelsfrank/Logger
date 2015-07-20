@@ -29,6 +29,7 @@
 //	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
 	#define ADDRESS     "tcp://frafle.ddns.net:22883"		// MQTT
 	#define CLIENTID    "Pi1"							// MQTT
+	#define BMP180
 	//#define ONE_WIRE
 
 #elif HOST == Pi2
@@ -677,7 +678,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	double python_datetime_sec;
    
    
-    //printf("[MQTT] Message arrived, topic: %s, message: ", topicName);
+	//printf("[MQTT] Message arrived, topic: %s, message: ", topicName);
 	
 	strcpy(buffer_msg, message->payload);
 	buffer_msg[message->payloadlen]='\0';
@@ -708,7 +709,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	printf("SQL statement: %s \n", sql);	
 */
 
-	#ifdef RELAYS
+#ifdef RELAYS
 		if(strcmp(topic_type,"Command")==0 && strcmp(topic_id,"Relays")==0)
 		{
 			if(strcmp(topic_location,"Home")==0 && strcmp(topic_area,"Garage")==0)
@@ -734,9 +735,9 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 					relays(RELAY4);
 			}
 		}
-	#endif
+#endif
 
-	#ifdef SQLITE
+#ifdef SQLITE
 
 		// IN PYTHON print datetime.date(1900, 1, 1).toordinal() RETURNS 693596
 		// IN PYTHON print datetime.date(1970, 1, 1).toordinal() RETURNS 719163
@@ -800,8 +801,8 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 			//if (rc2)
 			//	printf("prepare return code %d: %s\n\n", rc2, sqlite3_errmsg(db));			
 
-if(strcmp(topic_type,"Temp")==0 || strcmp(topic_type,"BP")==0 || strcmp(topic_type,"Hum")==0)
-{
+//if(strcmp(topic_type,"Temp")==0 || strcmp(topic_type,"BP")==0 || strcmp(topic_type,"Hum")==0)
+//{
 			printf("[SQLite] BEGIN  sqlite_transaction_flag=%d   sqlite_transaction_ctr=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr);
 
 			if (sqlite_transaction_flag==0)
@@ -820,7 +821,34 @@ if(strcmp(topic_type,"Temp")==0 || strcmp(topic_type,"BP")==0 || strcmp(topic_ty
 				sqlite_transaction_ctr++;
 			}
 			
-			sql_stmt_ptr=sql_stmt;
+//			sql_stmt_ptr=sql_stmt;
+
+                        /*** BIND VALUE ***/
+                        if((strcmp(topic_type, "Temp")==0)||(strcmp(topic_type, "BP")==0)||(strcmp(topic_type, "Hum")==0))
+                        {
+				sql_stmt=sql_stmt_real;
+
+                                rc2=sqlite3_bind_double(sql_stmt, 6, atof(buffer_msg));
+                                if (rc2)
+                                        printf("[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db)); 
+                        }
+
+                        if( (strcmp(topic_type, "Wifi")==0) || (strcmp(topic_type, "Contact")==0) )
+                        {
+				sql_stmt=sql_stmt_int;
+
+                                rc2=sqlite3_bind_int(sql_stmt, 6, atoi(buffer_msg));
+                                if (rc2)
+                                        printf("[SQLite] bind int return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+                        }
+                        if((strcmp(topic_type, "Command")==0))
+                        {
+				sql_stmt=sql_stmt_text;
+
+                                rc2=sqlite3_bind_text(sql_stmt, 6, buffer_msg, strlen(buffer_msg), 0);
+                                if (rc2)
+                                        printf("[SQLite] bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+			}
 
 			/*** BIND TOPIC ***/
 			rc2=sqlite3_bind_text(sql_stmt, 1, topic_location, strlen(topic_location), 0);
@@ -839,38 +867,10 @@ if(strcmp(topic_type,"Temp")==0 || strcmp(topic_type,"BP")==0 || strcmp(topic_ty
 				if (rc2)
 					printf("bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 
-
 			/*** BIND DATE ***/
 			rc2=sqlite3_bind_double(sql_stmt, 5, pythondatetime);
 			if (rc2)
 				printf("[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-
-
-
-			/*** BIND VALUE ***/
-			if((strcmp(topic_type, "Temp")==0)||(strcmp(topic_type, "BP")==0)||(strcmp(topic_type, "Hum")==0))
-			{
-
-				rc2=sqlite3_bind_double(sql_stmt, 6, atof(buffer_msg));
-				if (rc2)
-					printf("[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));	
-			}
-			
-			if( (strcmp(topic_type, "Wifi")==0) || (strcmp(topic_type, "Contact")==0) )
-			{
-
-				rc2=sqlite3_bind_int(sql_stmt, 6, atoi(buffer_msg));
-				if (rc2)
-					printf("[SQLite] bind int return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			}
-					
-			if((strcmp(topic_type, "Command")==0))
-			{
-				rc2=sqlite3_bind_text(sql_stmt, 6, buffer_msg, strlen(buffer_msg), 0);
-				if (rc2)
-					printf("[SQLite] bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			}
-			
 
 			/*** SQL COMMANDS ***/
 			rc2=sqlite3_step(sql_stmt);  // Run SQL INSERT
@@ -907,89 +907,9 @@ if(strcmp(topic_type,"Temp")==0 || strcmp(topic_type,"BP")==0 || strcmp(topic_ty
 			printf("[SQLite] END   sqlite_transaction_flag=%d   sqlite_transaction_ctr=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr);
 
 
-}				
+//}				
 
-//removed when adding transaction
-//			rc2=sqlite3_finalize(stmt);			if (rc2)
-//			if (rc2)
-//				printf("finalize return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-
-		/* ORIGINAL BINDING
-		if(rc1){
-			printf("Can't open database: %s. Missed value from %s\n", sqlite3_errmsg(db),topicName);
-		}else{
-			printf("Database opened: %s. Writing value from %s...\n", sqlite3_errmsg(db),topicName);
-		
-			rc2=sqlite3_prepare_v2(db, sql, strlen(sql), &stmt, NULL);
-			if (rc2)
-				printf("prepare return code %d: %s\n\n", rc2, sqlite3_errmsg(db));			
-			
-			rc2=sqlite3_bind_double(stmt, 1, pythondatetime);
-			if (rc2)
-				printf("bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			
-			if((strcmp(topic_type, "Temp")==0)||(strcmp(token, "BP")==0)||(strcmp(token, "Hum")==0))
-			{
-
-				rc2=sqlite3_bind_double(stmt, 2, atof(buffer_msg));
-				if (rc2)
-					printf("bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));	
-			}
-			
-			if( (strcmp(topic_type, "Wifi")==0) || (strcmp(token, "Contact")==0) )
-			{
-
-				rc2=sqlite3_bind_int(stmt, 2, atoi(buffer_msg));
-				if (rc2)
-					printf("bind int return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			}
-			
-			if((strcmp(topic_type, "Command")==0))
-			{
-				rc2=sqlite3_bind_text(stmt, 2, buffer_msg, strlen(buffer_msg), 0);
-				if (rc2)
-					printf("bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			}
-			
-			rc2=sqlite3_step(stmt);  // Run SQL INSERT
-			if (rc2)
-				printf("step return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			
-			rc2=sqlite3_reset(stmt); // Clear statement handle for next use
-			if (rc2)
-				printf("reset return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-		
-			rc2=sqlite3_finalize(stmt);
-			if (rc2)
-				printf("finalize return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			*/
-
-			/*
-			rc2=sqlite3_finalize(stmt);
-			if (rc2)
-				printf("finalize return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			
-			for(rc2=1,delay_time2=10;rc2&&delay_time2<1000;delay_time2+=100)
-			{
-
-
-				rc2 = sqlite3_close(db);
-				// If rc is not 0, there was an error
-				if(rc2){
-					printf("Can't close database: %s. Delaying %dms...\n", sqlite3_errmsg(db),delay_time2);
-					// Can't close database: unable to close due to unfinalised statements. -> SOLVED by sqlite3_finalize(stmt);
-					delay(delay_time2); // 100ms more delay each loop
-				}else{
-					printf("Database closed: %s\n", sqlite3_errmsg(db));
-// TO DO: Database closed: library routine called out of sequence -> UNSOLVED
-					}
-				
-				
-			}
-		*/	
-//		}
-	
-	#endif
+#endif
 
 	
     MQTTClient_freeMessage(&message);
@@ -1124,7 +1044,7 @@ int main(void)
 	#endif
 	printf("HOST = %s\n ",hostname);
 
-	#ifdef SQLITE
+#ifdef SQLITE
 
         //rc = sqlite3_open(dbPath, &db);
         rc = sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_FULLMUTEX | SQLITE_OPEN_READWRITE, NULL);
@@ -1151,7 +1071,7 @@ int main(void)
         rc=sqlite3_prepare_v2(db, sql, strlen(sql), &sql_stmt, NULL);
         if (rc)
                 printf("[SQLite] prepare return code %d: %s\n\n", rc, sqlite3_errmsg(db));
-	#endif
+#endif
 
 
 	//MQTT
@@ -1419,7 +1339,7 @@ int main(void)
 		MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
 		//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "Systems/Pi1/Temp/CPUTemp");
 
-		#ifdef WIFI
+#ifdef WIFI
 		// ****************************
 		//          WIFI
 		// ****************************
@@ -1500,11 +1420,11 @@ int main(void)
 		
 		close(sockfd);
 	
-		#endif
+#endif
 		
 		
 		
-		#ifdef BMP180
+#ifdef BMP180
 		
 		// ****************************
 		//      BAROMETRIC PRESSURE
@@ -1526,10 +1446,10 @@ int main(void)
 #elif HOST == Pi4
 		MQTTClient_publishMessage(client, "Home/Mike/BP/001", &pubmsg, &token);
 #endif		
-		#endif
+#endif
 		
 		
-		#ifdef CC2
+#ifdef CC2
 		
 		humidity=0;
 		temperatureC=0;
@@ -1553,18 +1473,17 @@ int main(void)
 #elif HOST == Pi4
 		MQTTClient_publishMessage(client, "Home/Mike/Hum/001", &pubmsg, &token);
 #endif
-		
-//		humidity;
-//		temperatureC;
-//		temperatureF;
 
-		#endif
+#endif
 
+
+
+
+#ifdef ONE_WIRE
 		// ****************************
 		//          ONE WIRE
 		// ****************************
 
-		#ifdef ONE_WIRE
 		
 		rootNode = malloc( sizeof(struct ds18b20) );
 		devNode = rootNode;
@@ -1729,7 +1648,7 @@ int main(void)
 		// Now free rootNode
 		free(rootNode);
 		
-		#endif
+#endif
 		
 		
 		//printf("[Logger] entering loop, mark_time = %d, now = %d, seconds = %d\n", mark_time.tv_sec, now.tv_sec, seconds) ; fflush (stdout) ;
