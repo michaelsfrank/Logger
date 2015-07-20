@@ -27,18 +27,23 @@
 #if HOST == Pi1
 	#define WIFI
 //	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
-	#define ADDRESS     "tcp://frafle.ddns.net:22883"		// MQTT
-	#define CLIENTID    "Pi1"							// MQTT
+	#define ADDRESS     "tcp://frafle.ddns.net:22883"	// MQTT
+	#define CLIENTID    "Pi1"				// MQTT
 	#define BMP180
+ 	#define CPUTEMP
 	//#define ONE_WIRE
+	#define MQTT
+	#define CONTACTS
 
 #elif HOST == Pi2
-	#define WIFI
+//	#define WIFI
 	#define NRF
 	#define ADDRESS     "tcp://frafle.ddns.net:22883"		// MQTT
 	#define CLIENTID    "Pi2"							// MQTT
-	#define ONE_WIRE
-	
+// 	#define CPUTEMP
+//	#define ONE_WIRE
+	#define MQTT	
+ 	#define CONTACTS
 
 #elif HOST == Pi3
 	#define WIFI
@@ -50,7 +55,10 @@
 	#define CC2
 	#define RELAYS
 	#define CONTACTS
-	
+ 	#define CPUTEMP
+	#define MQTT
+	#define CONTACTS
+
 #elif HOST == Pi4
 	#define WIFI
 	#define NRF
@@ -63,13 +71,19 @@
 	#define CONTACTS
 	#define SQLITE
 	#define HANDLECTLC	
+  	#define CPUTEMP
+	#define MQTT
+	#define CONTACTS
+
 #else
 	#define WIFI
 	#define NRF	
 	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
 	#define CLIENTID    "Default"							// MQTT
 	//#define ONE_WIRE
-	
+	#define MQTT
+	#define CPUTEMP
+
 #endif
 
 
@@ -114,6 +128,7 @@
 	#include <nRF24L01.h>	// nRF
 	#include <gpio.h>		// nRF
 	#define PAYLOAD_SIZE 8	// nRF
+    rf24_t radio_global;    // nRF
 #endif
 
 #ifdef BMP180
@@ -131,11 +146,15 @@
 
 #define LOCAL_DATA_INTERVAL 2	// Logger - main loop
 
-#ifdef RELAYS
+
+#ifdef CONTACTS
 	#define STATUS1 26
 	#define STATUS2 27
 	#define STATUS3 28
 	#define STATUS4 29
+#endif
+
+#ifdef RELAYS
 	#define RELAY1 21
 	#define RELAY2 22
 	#define RELAY3 23
@@ -203,12 +222,6 @@ struct data_queue {
 typedef struct data_queue data_queue_t;  // MF queue
 data_queue_t data;	  // MF queue
 
-
-#ifdef NRF
-	rf24_t radio_global;	// nRF
-#endif
-
-
 // Flag used by handler - changed to 0 when user presses Ctrl-C
 // Loop that reads & records temperatures keeps running when
 // loop_active_main = 1
@@ -268,20 +281,6 @@ int8_t volatile loop_active_msg_thread = 1;
 */
 #endif
 
-/*
- * myInterrupt:
- *********************************************************************************
- */
-
-void myInterrupt0 (void) { ++globalCounter [0]; }
-void myInterrupt1 (void) { ++globalCounter [1]; }
-void myInterrupt2 (void) { ++globalCounter [2]; printf("[WiringPi] Interrupt 2\n"); }	  // nRF
-void myInterrupt3 (void) { ++globalCounter [3]; }
-void myInterrupt4 (void) { ++globalCounter [4]; }
-void myInterrupt5 (void) { ++globalCounter [5]; }
-void myInterrupt6 (void) { ++globalCounter [6]; }
-//void myInterrupt7 (void) { ++globalCounter [7]; }
-
 #ifdef CC2
 	// ChipCap2 global variables
 	uint8_t  status;
@@ -313,11 +312,13 @@ void myInterrupt6 (void) { ++globalCounter [6]; }
 
 		if (dir != NULL)
 		{
-			while ((dirent = readdir(dir))) {
-				printf("[1-wire] FindDevices() dirent=readdir(dir)=%s\n",readdir);
+			while ((dirent = readdir(dir)))
+			{
+				//printf("[1-wire] FindDevices() dirent=readdir(dir)=%s\n",readdir);
 				//printf("[1-wire] FindDevices()   dirent->d_type=%d   dirent->d_name=%s\n",dirent->d_type, dirent->d_name);
 				// 1-wire devices are links beginning with 28-
-				if (dirent->d_type == DT_LNK && strstr(dirent->d_name, "28-") != NULL) {
+				if (dirent->d_type == DT_LNK && strstr(dirent->d_name, "28-") != NULL)
+				{
 					//printf("[1-wire] dirent->d_type=DT_LINK   dirent->d_name contains 28-\n",dirent->d_type, dirent->d_name);
 					newDev = malloc( sizeof(struct ds18b20) );
 					//printf("[1-wire] newDev Address = %d\n",&newDev);
@@ -341,7 +342,7 @@ void myInterrupt6 (void) { ++globalCounter [6]; }
 			(void) closedir(dir);
 		}
 		else {
-			perror ("Couldn't open the w1 devices directory");
+			perror ("Couldn't open the w1 devices directory\n");
 			return 1;
 		}
 		return i;
@@ -691,7 +692,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	topic_type		= strtok(NULL, topic_search);
 	topic_id 		= strtok(NULL, topic_search);
 
-	printf("Topic (broken down): %s %s %s %s \n", topic_location, topic_area, topic_type, topic_id);	
+	printf("Topic (broken down): %s %s %s %s \n", topic_location, topic_area, topic_type, topic_id);
 
 	//printf("string compares %d %d %d %d %d\n",strcmp(token, "Temp"),strcmp(token, "BP"),strcmp(token, "Hum"),strcmp(token, "Wifi"),strcmp(token, "Contact"));
 
@@ -939,39 +940,180 @@ void connlost(void *context, char *cause)
 	 *********************************************************************************
 	 */
 
-	 void rf24_configure(rf24_t *radio)
-	{
-		rf24_write_register(radio, 	CONFIG, 	0);
-		rf24_write_register(radio, 	EN_AA, 		0);					//    ENABLE AUTO ACK
-		rf24_write_register(radio, 	EN_RXADDR, 	3);					//    ENABLE ADDRESSES
-		rf24_write_register(radio, 	SETUP_AW, 	3); // 3 = 5 bytes	//    ADDRESS WIDTH
-		rf24_write_register(radio, 	SETUP_RETR, 0);					//    TRANSMIT RETRYS
-		rf24_write_register(radio, 	RF_CH, 		76);				//    RF CHANNEL
-		rf24_write_register(radio, 	RF_SETUP, 	_BV(RF_DR_LOW));	//    CLEAR INTERRUPTS
-		rf24_write_register(radio, 	DYNPD, 		0);					//    DYNAMIC PAYLOAD LENGTH
-		rf24_write_register(radio, 	FEATURE, 	0);					//    FEATURES
+int nrf_int=0;
 
-		rf24_write_register(radio, 	RX_PW_P0, 	8);
-		rf24_write_register(radio, 	RX_PW_P1, 	8);
-		rf24_write_register(radio, 	RX_PW_P2, 	8);
-		rf24_write_register(radio, 	RX_PW_P3, 	8);
-		rf24_write_register(radio, 	RX_PW_P4, 	8);
-		rf24_write_register(radio, 	RX_PW_P5, 	8);
+void rf24_configure(rf24_t *radio)
+{
+	rf24_write_register(radio, 	CONFIG, 	0);
+	rf24_write_register(radio, 	EN_AA, 		0);					//    ENABLE AUTO ACK
+	rf24_write_register(radio, 	EN_RXADDR, 	3);					//    ENABLE ADDRESSES
+	rf24_write_register(radio, 	SETUP_AW, 	3); // 3 = 5 bytes	//    ADDRESS WIDTH
+	rf24_write_register(radio, 	SETUP_RETR, 0);					//    TRANSMIT RETRYS
+	rf24_write_register(radio, 	RF_CH, 		76);				//    RF CHANNEL
+	rf24_write_register(radio, 	RF_SETUP, 	_BV(RF_DR_LOW));	//    CLEAR INTERRUPTS
+	rf24_write_register(radio, 	DYNPD, 		0);					//    DYNAMIC PAYLOAD LENGTH
+	rf24_write_register(radio, 	FEATURE, 	0);					//    FEATURES
 
-		rf24_write_address(radio, 	TX_ADDR,    0x77EE33FFFF);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
-		rf24_write_address(radio, 	RX_ADDR_P0, 0x77EE33FF11);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
-		rf24_write_address(radio, 	RX_ADDR_P1, 0x11FF33EE77);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
-		rf24_write_address(radio, 	RX_ADDR_P2, 0xc3c3c3c3c3);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
-		rf24_write_address(radio, 	RX_ADDR_P3, 0x4242424242);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
-		rf24_write_address(radio,	RX_ADDR_P4, 0x5656565656);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
-		rf24_write_address(radio, 	RX_ADDR_P5, 0x112233FF44);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
-		// the problem was MSWord / LSWord
+	rf24_write_register(radio, 	RX_PW_P0, 	8);
+	rf24_write_register(radio, 	RX_PW_P1, 	8);
+	rf24_write_register(radio, 	RX_PW_P2, 	8);
+	rf24_write_register(radio, 	RX_PW_P3, 	8);
+	rf24_write_register(radio, 	RX_PW_P4, 	8);
+	rf24_write_register(radio, 	RX_PW_P5, 	8);
 
-		rf24_write_register(radio, 	STATUS, 	_BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );		//    CLEAR INTERRUPTS
-	}
+	rf24_write_address(radio, 	TX_ADDR,    0x77EE33FFFF);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
+	rf24_write_address(radio, 	RX_ADDR_P1, 0x77EE33FF11);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
+	rf24_write_address(radio, 	RX_ADDR_P0, 0x11FF33EE77);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
+	rf24_write_address(radio, 	RX_ADDR_P2, 0xc3c3c3c3c3);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
+	rf24_write_address(radio, 	RX_ADDR_P3, 0x4242424242);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
+	rf24_write_address(radio,	RX_ADDR_P4, 0x5656565656);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
+	rf24_write_address(radio, 	RX_ADDR_P5, 0x112233FF44);	// warning: integer constant is too large for ‘long’ type [-Wlong-long]
+	// the problem was MSWord / LSWord
+
+	rf24_write_register(radio, 	STATUS, 	_BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );		//    CLEAR INTERRUPTS
+}
+
+
+
+void rx(rf24_t *radio, MQTTClient *client)
+{
+	int16_t temps[16];
+	uint8_t tctr,dctr=0,i, len, done, reg, pipe, data[32]={1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+	char buffer_char[256];
+	char smscmd[500];
+ 	
+	MQTTClient_message pubmsg = MQTTClient_message_initializer;
+ 	MQTTClient_deliveryToken token;
+	pubmsg.qos = QOS;
+	pubmsg.retained = 0;
+	deliveredtoken = 0;
+
+	FILE *fp;
+
+/*
+	//MQTT
+    char MQTT_topic[256]={0};
+	MQTTClient client;
+    MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
+    MQTTClient_message pubmsg = MQTTClient_message_initializer;
+    MQTTClient_deliveryToken token;
+	pubmsg.qos = QOS;
+	pubmsg.retained = 0;
+	deliveredtoken = 0;
+*/
+
+	// POWERUP & START LISTENING
+//	rf24_write_register(radio, CONFIG, rf24_read_register(radio, CONFIG) | _BV(PWR_UP) | _BV(PRIM_RX));
+//	rf24_write_register(radio, STATUS, _BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );
+//	usleep(4500);
+
+//	while (1)
+//	{
+	
+		// LISTENING
+//		gpio_write(radio->ce_pin, GPIO_PIN_HIGH);
+
+		//fprintf(stderr, "\r[RX] Waiting for interrupt...  ");
+		//while (!(rf24_get_status(radio) & _BV(RX_DR)));	
+		
+		// GOT INTERRUPT
+		
+		//rf24_dump_ext(radio,'r');
+	
+	 
+		// PROCESS DATA PIPES
+		pipe=(uint8_t)((reg >> RX_P_NO) & 0b111);
+	/*
+		if (pipe<6)	{
+			fprintf(stderr, "reading pipe %d...\n",pipe);
+			rf24_receive(radio, &buf, rf24_read_register(radio, pipe_payload_size_registers[i]));
+		} else {
+			fprintf(stderr, "reading fifo...\n");
+			rf24_receive(radio, &data, PAYLOAD_SIZE);
+			
+		}
+	*/
+		//  while( !( rf24_receive(radio, &data, PAYLOAD_SIZE) ) );	//  RETURNS STATUS OF RX_EMPTY BIT -  but it doesnt go low when data is received
+		
+		rf24_receive(radio, &data, PAYLOAD_SIZE); 	// RECEIVE
+
+/* 		
+		gpio_write(radio->csn_pin, GPIO_PIN_LOW);
+		data[0]=spi_transfer(radio->spi, R_RX_PAYLOAD);
+		
+		for (i=1;i<PAYLOAD_SIZE;i++)
+			data[i]=spi_transfer(radio->spi, 0xFF);
+		pipe=(uint8_t)((reg >> RX_P_NO) & 0b111);	// GET PIPE
+		
+		gpio_write(radio->csn_pin, GPIO_PIN_HIGH);
+		gpio_write(radio->ce_pin, GPIO_PIN_LOW);
+		
+ */
+
+
+		// PRINT DATA
+		fprintf(stderr, "\r                                                                                                                  ");
+		fprintf(stderr, "\r[RECEIEVED]   P%2d S%2d   data", pipe, PAYLOAD_SIZE);
+		for (i=0;i<PAYLOAD_SIZE+2;i++)
+			fprintf(stderr, " %5d ",data[i]);
+		fprintf(stderr, "\n");
+		
+		// *** CONVERT ***************
+		for (dctr=0,tctr=0;dctr<PAYLOAD_SIZE;dctr+=2,tctr++)
+		{
+			temps[tctr] = (int16_t)(0xFF*data[dctr]) + (int16_t)data[dctr+1];
+//			fprintf(stderr, "\r[converting]      dctr %d   tctr %d   data[dctr] %d   data[dctr+1] %2d   temps[tctr] %d           \n", dctr, tctr, data[dctr], data[dctr+1], temps[tctr]);
+		}
+		
+		for (;tctr<16;tctr++);
+			temps[tctr] = 0;
+
+		if (data[7]==70 || data[7]==86) {
+			fprintf(stderr, "FISH ON!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+			sprintf(smscmd, "curl -H %cAuthorization: Token 90b9c796a85fa2c936ad5f7f6eb1f2869e712ca7%c -H %cContent-Type: application/json%c -X POST -d %c{ %c%cbody%c%c : %c%cFISH ON and water temp is %.1dC%c%c, %c%cmessage_type%c%c : %c%ctext/plain%c%c }%c http:%c%capi.pushetta.com%capi%cpushes%cFraTol%c",
+			0x22,0x22,0x22,0x22,0x22,
+			0x5C,0x22,0x5C,0x22,0x5C,0x22,
+			temps[0]/10,
+			0x5C,0x22,0x5C,0x22,0x5C,0x22,0x5C,0x22,0x5C,0x22,
+			0x22,
+			0x2F,0x2F,0x2F,0x2F,0x2F,0x2F);
+			system(smscmd);
+		}	
+			
+		// PRINT CONVERSION
+		fprintf(stderr, "\r                                                                                                                  ");
+		fprintf(stderr, "\r[CONVERTED]   P%2d S%2d   temps ", pipe, PAYLOAD_SIZE/2);
+		for (tctr=0;tctr<PAYLOAD_SIZE/2;tctr++)
+			fprintf(stderr, " %5d ",temps[tctr]);
+		fprintf(stderr, "\n");
+
+		// PRINT DATA TO FILE
+		fp=fopen("tempdata.txt","a");
+		fprintf(fp,     "P%d S%d ", pipe, PAYLOAD_SIZE/2);
+		for (tctr=0;tctr<PAYLOAD_SIZE/2;tctr++)
+			fprintf(fp,     "%d ",temps[tctr]);
+		fprintf(fp,     "\n");
+		//usleep(10000);
+		fclose(fp);		// CLOSE FILE
+
+        sprintf(buffer_char,"%f",((float)temps[0])/10);
+        pubmsg.payload = buffer_char;
+        pubmsg.payloadlen = strlen(buffer_char);
+        MQTTClient_publishMessage(client, "Cottage/Lake/Temp/FrankDock1ft", &pubmsg, &token);
+
+	//}
+	
+	return;
+}
+
+void nrf_int_handler (void)
+{
+	printf("[nrf int handler] nrf_int=%d -> ", nrf_int);
+	nrf_int++;
+	printf("%d \n", nrf_int);
+}	  // nRF
+
 #endif
-
-
 
 /*
  *********************************************************************************
@@ -982,8 +1124,8 @@ void connlost(void *context, char *cause)
 int main(void)
 {
 	char hostname[20]={0};
-	int gotOne, pin ;	// isr
-	int myCounter [8] ;	// isr
+	//int gotOne, pin ;	// isr
+	//int myCounter [8] ;	// isr
 	int i;	// address counter	// isr
 	struct timeval mark_time, now;//time
 	long int seconds;			// time
@@ -997,7 +1139,7 @@ int main(void)
 	#ifdef HANDLECTLC
 		signal(SIGINT, intHandler);
 	#endif
-    
+
 	char 	buffer_char[256];
 	float 	buffer_f=0;
 	double 	buffer_lf=0;
@@ -1028,8 +1170,6 @@ int main(void)
 		struct iw_statistics wstats;	//	http://w1.fi/hostapd/devel/structiw__statistics.html
 	#endif
     
-
-	
 	// HOST
 	#if HOST == Pi1
 		strcpy(hostname,"Pi1\0");
@@ -1071,9 +1211,9 @@ int main(void)
         rc=sqlite3_prepare_v2(db, sql, strlen(sql), &sql_stmt, NULL);
         if (rc)
                 printf("[SQLite] prepare return code %d: %s\n\n", rc, sqlite3_errmsg(db));
-#endif
+#endif	// SQLITE
 
-
+#ifdef MQTT
 	//MQTT
     char MQTT_topic[256]={0};
 	MQTTClient client;
@@ -1099,6 +1239,7 @@ int main(void)
 
 	// MQTT Subscriptions - this is a crashing MQTT client!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	//  [MQTT] Connection lost, cause: (null)
+
 	#ifdef SQLITE
 		
 		MQTTClient_subscribe(client, "Home/#", QOS);
@@ -1136,8 +1277,8 @@ int main(void)
 		MQTTClient_subscribe(client, "Home/Garage/Command/Relays", QOS);
 */	
 	
-	#endif
-
+	#endif 	// SQLITE
+#endif	// MQTT
 
 	
 
@@ -1158,12 +1299,11 @@ int main(void)
 	}
 	#endif
 
-	for (pin = 0 ; pin < 8 ; ++pin) 
-		globalCounter [pin] = myCounter [pin] = 0 ;
+//	for (pin = 0 ; pin < 8 ; ++pin) 
+//		globalCounter [pin] = myCounter [pin] = 0 ;
 
 	wiringPiSetup();
 
-	wiringPiISR (11, INT_EDGE_FALLING, &myInterrupt2) ; // nRF hardware interrupt - Pi1/2/3/4 
 /*
 	wiringPiISR (0, INT_EDGE_FALLING, &myInterrupt0) ; // home: open
 	wiringPiISR (1, INT_EDGE_FALLING, &myInterrupt1) ; // home: open
@@ -1216,25 +1356,49 @@ int main(void)
 	#endif
 
 	#ifdef NRF
-	// ********* nRF *********
-	//rf24_t radio_global; // replaced with radio_global
+		// ********* nRF *********
+		//rf24_t radio_global; // replaced with radio_global
+		//uint8_t ctr=0, rx_buffer[32]={0}, reg, input;
+		//uint64_t pipe_addresses[2] = { 0x1122334455LL,  0x1122334400LL };
+		rf24_t radio;
 
-	rf24_initialize(&radio_global, RF24_SPI_DEV_0, 25, 7);
-	rf24_reset_status(&radio_global);
-	rf24_configure(&radio_global);
+        // HOST
+        #if HOST == Pi1
+                rf24_initialize(&radio, RF24_SPI_DEV_0, 25, 8);
+        #elif HOST == Pi2
+                rf24_initialize(&radio, RF24_SPI_DEV_0, 25, 8);
+        #elif HOST == Pi3
+                rf24_initialize(&radio, RF24_SPI_DEV_0, 25, 7);
+        #elif HOST == Pi4
+                rf24_initialize(&radio, RF24_SPI_DEV_0, 25, 7);
+        #else
+                rf24_initialize(&radio, RF24_SPI_DEV_0, 25, 7);
+        #endif
 
-	// POWERUP & START LISTENING
-	rf24_write_register(&radio_global, CONFIG, rf24_read_register(&radio_global, CONFIG) | _BV(PWR_UP) | _BV(PRIM_RX));
-	rf24_write_register(&radio_global, STATUS, _BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );
-	usleep(4500);
-	gpio_write(radio_global.ce_pin, GPIO_PIN_HIGH);
+		rf24_reset_status(&radio);
+		rf24_configure(&radio);
+
+		// POWERUP & START LISTENING
+		rf24_write_register(&radio, CONFIG, rf24_read_register(&radio, CONFIG) | _BV(PWR_UP) | _BV(PRIM_RX));
+		rf24_write_register(&radio, STATUS, _BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );
+		usleep(4500);
+		gpio_write(radio.ce_pin, GPIO_PIN_HIGH);
+
+		wiringPiISR (11, INT_EDGE_FALLING, &nrf_int_handler); // nRF hardware interrupt - Pi1/2/3/4 
+
+//		wiringPiISR (11, INT_EDGE_FALLING, &nrf_int_handler(radio) ); // nRF hardware interrupt - Pi1/2/3/4 
+//			examples/Logger.c:1362:3: error: incompatible type for argument 1 of ‘nrf_int_handler’
+//			examples/Logger.c:1070:6: note: expected ‘struct rf24_t *’ but argument is of type ‘rf24_t’
+
+
+//		wiringPiISR (11, INT_EDGE_FALLING, &nrf_int_handler(&(radio)) ); // nRF hardware interrupt - Pi1/2/3/4 
+
 	#endif
-
 
 
 	while (loop_active_main)
 	{
-		gotOne = 0 ;
+//		gotOne = 0 ;
 
 		printf("[Logger] Service local data collection\n");
 
@@ -1251,9 +1415,27 @@ int main(void)
 #ifdef CONTACTS
 
 #if HOST == Pi1
+        sprintf(buffer_char,"%d",!digitalRead(STATUS1));
+        pubmsg.payload = buffer_char;
+        pubmsg.payloadlen = strlen(buffer_char);
+        MQTTClient_publishMessage(client, "Cottage/Mike/Contact/WindowBack", &pubmsg, &token);
+
+        sprintf(buffer_char,"%d",!digitalRead(STATUS2));
+        pubmsg.payload = buffer_char;
+        pubmsg.payloadlen = strlen(buffer_char);
+        MQTTClient_publishMessage(client, "Cottage/Mike/Contact/WindowSide", &pubmsg, &token);
 
 
 #elif HOST == Pi2
+        sprintf(buffer_char,"%d",!digitalRead(STATUS1));
+        pubmsg.payload = buffer_char;
+        pubmsg.payloadlen = strlen(buffer_char);
+        MQTTClient_publishMessage(client, "Cottage/Mike/Contact/WindowFront", &pubmsg, &token);
+
+        sprintf(buffer_char,"%d",!digitalRead(STATUS2));
+        pubmsg.payload = buffer_char;
+        pubmsg.payloadlen = strlen(buffer_char);
+        MQTTClient_publishMessage(client, "Cottage/Mike/Contact/Door", &pubmsg, &token);
 
 
 #elif HOST == Pi3
@@ -1276,7 +1458,6 @@ int main(void)
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
 		MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorFar", &pubmsg, &token);
-		
 
 #elif HOST == Pi4
 		sprintf(buffer_char,"%d",!digitalRead(STATUS1));
@@ -1298,13 +1479,10 @@ int main(void)
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
 		MQTTClient_publishMessage(client, "Home/Mike/Contact/004", &pubmsg, &token);
-		
 
 #endif
 
 #endif
-		
-		
 		/*
 		// MQTT Test Publish
 		pubmsg.payload = PAYLOAD;
@@ -1318,6 +1496,7 @@ int main(void)
 		//	printf("[MQTT] Still not delivered\n");
 		*/
 
+#ifdef CPUTEMP
 		// ****************************
 		//          CPU Temp
 		// ****************************
@@ -1338,6 +1517,7 @@ int main(void)
 		pubmsg.payloadlen = strlen(buffer_char);
 		MQTTClient_publishMessage(client, MQTT_topic, &pubmsg, &token);
 		//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "Systems/Pi1/Temp/CPUTemp");
+#endif	// CPUTEMP
 
 #ifdef WIFI
 		// ****************************
@@ -1420,7 +1600,7 @@ int main(void)
 
 		close(sockfd);
 
-#endif
+#endif	// WIFI
 
 #ifdef BMP180
 
@@ -1447,7 +1627,7 @@ int main(void)
 #elif HOST == Pi4
 		MQTTClient_publishMessage(client, "Home/Mike/BP/001", &pubmsg, &token);
 #endif
-#endif
+#endif	// BMP180
 
 #ifdef CC2
 		
@@ -1464,6 +1644,7 @@ int main(void)
 		// MQTT local bmp180 pressure sensor
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
+
 #if HOST == Pi1
 		MQTTClient_publishMessage(client, "Cottage/Mike/Hum/001", &pubmsg, &token);
 #elif HOST == Pi2
@@ -1551,9 +1732,9 @@ int main(void)
 			else if (!strcmp(devNode->devID, "28-000005e9e919"))
 				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp5", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005ea9920"))
-                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp5", &pubmsg, &token);
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp6", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005eac141"))
-                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp5", &pubmsg, &token);
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp7", &pubmsg, &token);
 #endif
 #if HOST == Pi3
 			if (!strcmp(devNode->devID, "28-04146d2647ff"))
@@ -1636,7 +1817,8 @@ int main(void)
 
 		*/
 		
-		while(rootNode) {
+		while(rootNode)
+		{
 			// Start with current value of root node
 			devNode = rootNode;
 			// Save address of next devNode to rootNode before 
@@ -1648,19 +1830,66 @@ int main(void)
 		// Now free rootNode
 		free(rootNode);
 		
-#endif
+#endif	// ONEWIRE
 		
 		
 		//printf("[Logger] entering loop, mark_time = %d, now = %d, seconds = %d\n", mark_time.tv_sec, now.tv_sec, seconds) ; fflush (stdout) ;
 		////printf("[Logger] entering loop, mark_time = %lf, now = %lf, seconds = %lf\n", mark_time, now, seconds) ; fflush (stdout) ;
 		
-		for (; seconds<10;) {
+		for (; seconds<10;)
+		{
 			gettimeofday(&now,NULL);
 			//time(&now);
 			seconds=now.tv_sec-mark_time.tv_sec;
+/*
+			if ( nrf_int_rx_dr )
+			{
+				nrf_int_rx_dr--;
+				printf("RX_DR processing...");
+				rx(&radio);
+			}		
+			if ( nrf_int_tx_ds )	
+			{
+				nrf_int_tx_ds--;
+				printf("TX_DS processing...");
+			}
+			if ( nrf_int_max_rt )
+			{
+				nrf_int_max_rt--;
+				printf("MAX_RT processing...");
+			}
 
-			
-			
+*/
+#ifdef NRF
+			if(nrf_int)
+			{
+				printf("[nRF] Interrupt... nrf_int=%d, ",nrf_int);
+				if ( rf24_get_status(&radio) & _BV(RX_DR) )
+				{	
+					printf("RX_DR\n");
+//					rx(&radio, &client, &pubmsg, &token);
+					rx(&radio, client);
+					rf24_write_register(&radio,	STATUS,	_BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );
+					nrf_int--;
+				}
+				else if ( rf24_get_status(&radio) & _BV(TX_DS) )	
+				{
+					printf("TX_DS\n");
+					nrf_int--;
+				}
+				else if ( rf24_get_status(&radio) & _BV(MAX_RT) )
+				{
+					printf("MAX_RT\n");
+					nrf_int--;
+				}
+				else
+				{
+					printf("no flag set in nRF24 module... resetting nrf_int=0\n");
+					nrf_int=0;
+				}
+			}
+
+#endif	// NRF
 			//printf("[Logger] looping, mark_time = %d, now = %d, seconds = %d\n", mark_time.tv_sec, now.tv_sec, seconds) ; fflush (stdout) ;
 			
 //			if(rf24_isrFlag)
@@ -1672,36 +1901,42 @@ int main(void)
 				printf("[Logger] nrf24 RX_DR bit set\n");
 */
 				
-				
-			for (pin = 0 ; pin < 8 ; ++pin) {
-				if (globalCounter [pin] != myCounter [pin]) {
+/*				
+			for (pin = 0 ; pin < 8 ; ++pin)
+			{
+				if (globalCounter [pin] != myCounter [pin])
+				{
 					printf("[Logger] Int on pin %d: Counter: %5d\n", pin, globalCounter [pin]) ;
 					myCounter [pin] = globalCounter [pin] ;
 					++gotOne ;
 					switch (pin) {
 						#ifdef NRF
-						case '2':	rf24_receive(&radio_global, &data.d, 32);
-									rf24_write_register(&radio_global, 	STATUS, 	_BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );
-									for (i==0;i<32;i++)
-										fprintf(stderr, " %5d ",data.d[i]);
-									fprintf(stderr, "\n");
-									
-									break;
+						case 2:	printf("[Logger] nRF receiving data...\n");
+								
+								rx(&radio);
+							
+							rf24_receive(&radio_global, &data.d, 32);
+							rf24_write_register(&radio_global, 	STATUS, 	_BV(RX_DR) | _BV(TX_DS) | _BV(MAX_RT) );
+							for (i==0;i<32;i++)
+								fprintf(stderr, " %5d ",data.d[i]);
+							fprintf(stderr, "\n");
+							
+							break;
 						#endif
-						default:	
+						default:
 									
 									break;
 					}
 				}
 			}
-	
+*/
 			
-			if (gotOne != 0)
-			break ;
-		}
+			//if (gotOne != 0)
+			//break ;
+		}	// FOR
 		//printf("[Logger] exiting loop, mark_time = %d, now = %d, seconds = %d\n", mark_time.tv_sec, now.tv_sec, seconds) ; fflush (stdout) ;
 		
-	}
+	}	//
 
 
 
@@ -1712,16 +1947,19 @@ int main(void)
 	{
 		rc = sqlite3_close(db);
 		// If rc is not 0, there was an error
-		if(rc){
+		if(rc)
+		{
 			printf("Can't close database, return code $d: %s. Delaying %dms...\n", rc, sqlite3_errmsg(db),delay_time2);
 			// Can't close database: unable to close due to unfinalised statements. -> SOLVED by sqlite3_finalize(stmt);
 			delay(delay_time2); // 100ms more delay each loop
-		}else{
-			printf("Database closed, return code %d: %s\n", rc, sqlite3_errmsg(db));
-// TO DO: 
 		}
-	}
-#endif
+		else
+		{
+			printf("Database closed, return code %d: %s\n", rc, sqlite3_errmsg(db));
+		} // if(rc)
+	
+	} // for(rc...)
+#endif	// 	while (loop_active_main)
 	
 	return 0 ;
-}
+}	// MAIN
