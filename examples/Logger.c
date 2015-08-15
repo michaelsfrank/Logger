@@ -1721,7 +1721,11 @@ int main(void)
 				MQTTClient_publishMessage(client, "Cottage/MikesRoom/Temp/Floor2", &pubmsg, &token);
 #endif
 #if HOST == Pi2
+// Pi2 cd /sys/bus/w1/devices/
+// 28-0000007c750d  28-0000015dd661  28-000005e50d0a  28-000005e9a47f  28-000005e9e919  28-000005ea9920  28-000005eac141  w1_bus_master1
 			if (!strcmp(devNode->devID, "28-0000007c750d"))
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp0", &pubmsg, &token);
+                        else if (!strcmp(devNode->devID, "28-0000015dd661"))
 				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp1", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-0000015dd661"))
 				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp2", &pubmsg, &token);
