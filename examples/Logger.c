@@ -64,16 +64,16 @@
 	#define NRF
 	#define ADDRESS     "tcp://localhost:1883"			// MQTT
 	#define CLIENTID    "Pi4"							// MQTT
-	#define ONE_WIRE
-	#define BMP180
-	#define CC2
-	#define RELAYS
-	#define CONTACTS
+//	#define ONE_WIRE
+//	#define BMP180
+//	#define CC2
+//	#define RELAYS
+//	#define CONTACTS
 	#define SQLITE
 	#define HANDLECTLC	
   	#define CPUTEMP
 	#define MQTT
-	#define CONTACTS
+//	#define CONTACTS
 
 #else
 	#define WIFI
@@ -244,7 +244,7 @@ int8_t volatile loop_active_msg_thread = 1;
 	sqlite3 *db = NULL;
 
 	// Path to DB file - same dir as this program's executable
-	char *dbPath = "Logger.db";
+	char *dbPath = "/var/www/Logger.db";
 
 	char sql[255];
 	char sql_real[255];
@@ -260,8 +260,10 @@ int8_t volatile loop_active_msg_thread = 1;
 	
 	// transaction counter
 	int sqlite_transaction_ctr=0;
+	int sqlite_transaction_tmr=0;
 	int sqlite_transaction_flag=0;
-
+	#define SQLITE_TRANSACTION_INTERVAL 1
+	#define SQLITE_TRANSACTION_COUNT 1000
 /*
 	sprintf(sql_real, "INSERT INTO Real(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");
 	//sprintf(sql_int, "INSERT INTO Int(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");
@@ -644,7 +646,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	double cpu_time_used;
 	start=clock();
 	
-	printf("loop_active_msg_thread=%d\n", loop_active_msg_thread);
+//	printf("loop_active_msg_thread=%d\n", loop_active_msg_thread);
 	
 	int i;
 	
@@ -755,11 +757,11 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 
 		loctime=localtime(&unixtime);
 		//loctime=localtime(time(NULL));
-		printf("localtime = y %d d %d h %d m %d s %d dst %d \n", loctime->tm_year, loctime->tm_yday, loctime->tm_hour, loctime->tm_min, loctime->tm_sec, loctime->tm_isdst);
+//		printf("localtime = y %d d %d h %d m %d s %d dst %d \n", loctime->tm_year, loctime->tm_yday, loctime->tm_hour, loctime->tm_min, loctime->tm_sec, loctime->tm_isdst);
 		printf("ASCII Current local time and date: %s\n", asctime(loctime));
-		
-		
-		
+
+
+
 		python_datetime_2000=(double)(730120);
 		python_datetime_years_since_2000=(double)(loctime->tm_year-100)*365;
 		python_datetime_days=(double)(loctime->tm_yday);
@@ -804,17 +806,18 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 
 //if(strcmp(topic_type,"Temp")==0 || strcmp(topic_type,"BP")==0 || strcmp(topic_type,"Hum")==0)
 //{
-			printf("[SQLite] BEGIN  sqlite_transaction_flag=%d   sqlite_transaction_ctr=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr);
+			printf("[SQLite] BEGIN  sqlite_transaction_flag=%d   sqlite_transaction_ctr=%d   sqlite_transaction_tmr=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr,sqlite_transaction_tmr);
 
 			if (sqlite_transaction_flag==0)
 			{
 				sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &sqlErrMsg);
 				if(sqlErrMsg)
 					printf("[SQLite] Begin Transaction Error: %s\n", sqlErrMsg);
-				else
-					printf("[SQLite] Begin Transaction\n");
+//				else
+//					printf("[SQLite] Begin Transaction\n");
 			
-				sqlite_transaction_flag=1;	
+				sqlite_transaction_flag=1;
+				sqlite_transaction_tmr=loctime->tm_min;
 			}
 
 			if (sqlite_transaction_flag==1)
@@ -877,17 +880,17 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 			rc2=sqlite3_step(sql_stmt);  // Run SQL INSERT
 			if (rc2 && (rc2 != 101))
 				printf("[SQLite] step return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			printf("[SQLite]  Step completed\n");
+//			printf("[SQLite]  Step completed\n");
 
 			rc2=sqlite3_clear_bindings(sql_stmt);
 			if (rc2)
 				printf("[SQLite] reset return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			printf("[SQLite]  Clear bindings completed\n");
+//			printf("[SQLite]  Clear bindings completed\n");
 			
 			rc2=sqlite3_reset(sql_stmt); // Clear statement handle for next use
 			if (rc2)
 				printf("[SQLite] reset return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
-			printf("[SQLite]  Reset completed\n");
+//			printf("[SQLite]  Reset completed\n");
 
 			if (sqlite_transaction_flag==2)
 			{
@@ -896,17 +899,17 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 					printf("[SQLite] End Transaction Error: %s\n\n", sqlErrMsg);
 				sqlite_transaction_flag=0;
 				sqlite_transaction_ctr=0;
-
+				sqlite_transaction_tmr=loctime->tm_min;
 			}
 			else
-				printf("[SQLite]  Transaction skipped.\n");
+			{
+//				printf("[SQLite]  Transaction skipped.\n");
 
-			// SQLITE TRANSACTION COUNTER HOOK - comment out to disconnect counter
-			if (sqlite_transaction_ctr==10)
-				sqlite_transaction_flag=2;
-
-			printf("[SQLite] END   sqlite_transaction_flag=%d   sqlite_transaction_ctr=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr);
-
+				// SQLITE TRANSACTION COUNTER HOOK - comment out to disconnect counter
+				if ((sqlite_transaction_ctr==SQLITE_TRANSACTION_COUNT)||(loctime->tm_min-sqlite_transaction_tmr>=SQLITE_TRANSACTION_INTERVAL))
+					sqlite_transaction_flag=2;
+			}
+			printf("[SQLite] END   sqlite_transaction_flag=%d   _ctr=%d   _tmr=%d   loctime->tm_min=%d   diff=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr,sqlite_transaction_tmr,loctime->tm_min,loctime->tm_min-sqlite_transaction_tmr);
 
 //}				
 
@@ -916,13 +919,13 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
     MQTTClient_freeMessage(&message);
     MQTTClient_free(topicName);
     loop_active_msg_thread=0;
-	printf("loop_active_msg_thread=%d\n", loop_active_msg_thread);
+//	printf("loop_active_msg_thread=%d\n", loop_active_msg_thread);
 	end=clock();
-	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	printf("start %d, end %d, CPU time %f\n", start, end, cpu_time_used);
-	fp = fopen ("Logger_msgarrvd.txt", "a");
-	fprintf(fp, "%f\n",cpu_time_used);
-	fclose(fp);
+//	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+//	printf("start %d, end %d, CPU time %f\n", start, end, cpu_time_used);
+//	fp = fopen ("Logger_msgarrvd.txt", "a");
+//	fprintf(fp, "%f\n",cpu_time_used);
+//	fclose(fp);
 	return 1;
 }
 
@@ -1052,11 +1055,11 @@ void rx(rf24_t *radio, MQTTClient *client)
 
 
 		// PRINT DATA
-		fprintf(stderr, "\r                                                                                                                  ");
-		fprintf(stderr, "\r[RECEIEVED]   P%2d S%2d   data", pipe, PAYLOAD_SIZE);
-		for (i=0;i<PAYLOAD_SIZE+2;i++)
-			fprintf(stderr, " %5d ",data[i]);
-		fprintf(stderr, "\n");
+//		fprintf(stderr, "\r                                                                                                                  ");
+//		fprintf(stderr, "\r[RECEIEVED]   P%2d S%2d   data", pipe, PAYLOAD_SIZE);
+//		for (i=0;i<PAYLOAD_SIZE+2;i++)
+//			fprintf(stderr, " %5d ",data[i]);
+//		fprintf(stderr, "\n");
 		
 		// *** CONVERT ***************
 		for (dctr=0,tctr=0;dctr<PAYLOAD_SIZE;dctr+=2,tctr++)
@@ -1081,20 +1084,20 @@ void rx(rf24_t *radio, MQTTClient *client)
 		}	
 			
 		// PRINT CONVERSION
-		fprintf(stderr, "\r                                                                                                                  ");
-		fprintf(stderr, "\r[CONVERTED]   P%2d S%2d   temps ", pipe, PAYLOAD_SIZE/2);
-		for (tctr=0;tctr<PAYLOAD_SIZE/2;tctr++)
-			fprintf(stderr, " %5d ",temps[tctr]);
-		fprintf(stderr, "\n");
+//		fprintf(stderr, "\r                                                                                                                  ");
+//		fprintf(stderr, "\r[CONVERTED]   P%2d S%2d   temps ", pipe, PAYLOAD_SIZE/2);
+//		for (tctr=0;tctr<PAYLOAD_SIZE/2;tctr++)
+//			fprintf(stderr, " %5d ",temps[tctr]);
+//		fprintf(stderr, "\n");
 
 		// PRINT DATA TO FILE
-		fp=fopen("tempdata.txt","a");
-		fprintf(fp,     "P%d S%d ", pipe, PAYLOAD_SIZE/2);
-		for (tctr=0;tctr<PAYLOAD_SIZE/2;tctr++)
-			fprintf(fp,     "%d ",temps[tctr]);
-		fprintf(fp,     "\n");
+//		fp=fopen("tempdata.txt","a");
+//		fprintf(fp,     "P%d S%d ", pipe, PAYLOAD_SIZE/2);
+//		for (tctr=0;tctr<PAYLOAD_SIZE/2;tctr++)
+//			fprintf(fp,     "%d ",temps[tctr]);
+//		fprintf(fp,     "\n");
 		//usleep(10000);
-		fclose(fp);		// CLOSE FILE
+//		fclose(fp);		// CLOSE FILE
 
         sprintf(buffer_char,"%f",((float)temps[0])/10);
         pubmsg.payload = buffer_char;
@@ -1243,6 +1246,7 @@ int main(void)
 	#ifdef SQLITE
 		
 		MQTTClient_subscribe(client, "Home/#", QOS);
+		MQTTClient_subscribe(client, "Cottage/#", QOS);
 		MQTTClient_subscribe(client, "Systems/#", QOS);
 
 /*
