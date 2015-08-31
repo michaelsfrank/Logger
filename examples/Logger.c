@@ -36,13 +36,13 @@
 	#define CONTACTS
 
 #elif HOST == Pi2
-//	#define WIFI
+	#define WIFI
 	#define NRF
 	#define ADDRESS     "tcp://frafle.ddns.net:22883"		// MQTT
 	#define CLIENTID    "Pi2"							// MQTT
-// 	#define CPUTEMP
-//	#define ONE_WIRE
-	#define MQTT	
+ 	#define CPUTEMP
+	#define ONE_WIRE
+	#define MQTT
  	#define CONTACTS
 
 #elif HOST == Pi3
@@ -1723,22 +1723,21 @@ int main(void)
 #if HOST == Pi2
 // Pi2 cd /sys/bus/w1/devices/
 // 28-0000007c750d  28-0000015dd661  28-000005e50d0a  28-000005e9a47f  28-000005e9e919  28-000005ea9920  28-000005eac141  w1_bus_master1
+
 			if (!strcmp(devNode->devID, "28-0000007c750d"))
-                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp0", &pubmsg, &token);
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/001", &pubmsg, &token);
                         else if (!strcmp(devNode->devID, "28-0000015dd661"))
-				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp1", &pubmsg, &token);
-			else if (!strcmp(devNode->devID, "28-0000015dd661"))
-				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp2", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/002", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005e50d0a"))
-				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp3", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/003", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005e9a47f"))
-				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp4", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/004", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005e9e919"))
-				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp5", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/005", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005ea9920"))
-                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp6", &pubmsg, &token);
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/006", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-000005eac141"))
-                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Temp7", &pubmsg, &token);
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/007", &pubmsg, &token);
 #endif
 #if HOST == Pi3
 			if (!strcmp(devNode->devID, "28-04146d2647ff"))
