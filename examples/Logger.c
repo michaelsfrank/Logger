@@ -254,10 +254,10 @@ int8_t volatile loop_active_msg_thread = 1;
 
 	// DB Statement handle - used to run SQL statements
 	sqlite3_stmt *sql_stmt = NULL;
-	sqlite3_stmt *sql_stmt_ptr = NULL;
-	sqlite3_stmt *sql_stmt_real = NULL;
-	sqlite3_stmt *sql_stmt_int = NULL;
-	sqlite3_stmt *sql_stmt_text = NULL;
+//	sqlite3_stmt *sql_stmt_ptr = NULL;
+//	sqlite3_stmt *sql_stmt_real = NULL;
+//	sqlite3_stmt *sql_stmt_int = NULL;
+//	sqlite3_stmt *sql_stmt_text = NULL;
 	
 	// transaction counter
 	int sqlite_transaction_ctr=0;
@@ -698,7 +698,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	topic_type		= strtok(NULL, topic_search);
 	topic_id 		= strtok(NULL, topic_search);
 
-	printf("Topic (broken down): %s %s %s %s \n", topic_location, topic_area, topic_type, topic_id);
+	printf("%15s  %15s  %15s  %15s  %15s\n", topic_location, topic_area, topic_type, topic_id, buffer_msg);
 	//printf("%s_%s_%s_%s", topic_location, topic_area, topic_type, topic_id);
 	sprintf(tableName,"%s_%s_%s_%s", topic_location, topic_area, topic_type, topic_id);
 	//printf("tableName = %s\n",tableName);
@@ -813,7 +813,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 
 //if(strcmp(topic_type,"Temp")==0 || strcmp(topic_type,"BP")==0 || strcmp(topic_type,"Hum")==0)
 //{
-			printf("[SQLite] BEGIN  sqlite_transaction_flag=%d   sqlite_transaction_ctr=%d   sqlite_transaction_tmr=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr,sqlite_transaction_tmr);
+			//printf("[SQLite] BEGIN  sqlite_transaction_flag=%d   sqlite_transaction_ctr=%d   sqlite_transaction_tmr=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr,sqlite_transaction_tmr);
 
 			if (sqlite_transaction_flag==0)
 			{
@@ -843,7 +843,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 		        rc=sqlite3_prepare_v2(db, sql, strlen(sql), &sql_stmt, NULL);
 		        if (rc)
 		                printf("[SQLite] prepare return code %d: %s\n\n", rc, sqlite3_errmsg(db));
-			printf("sql_stmt=%s\n",sql_stmt);
+//			printf("sql_stmt=%s\n",sql_stmt);
 
 
 			/*** BIND DATE ***/
@@ -963,7 +963,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 				if ((sqlite_transaction_ctr==SQLITE_TRANSACTION_COUNT)||(loctime->tm_min-sqlite_transaction_tmr>=SQLITE_TRANSACTION_INTERVAL))
 					sqlite_transaction_flag=2;
 			}
-			printf("[SQLite] END   sqlite_transaction_flag=%d   _ctr=%d   _tmr=%d   loctime->tm_min=%d   diff=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr,sqlite_transaction_tmr,loctime->tm_min,loctime->tm_min-sqlite_transaction_tmr);
+			//printf("[SQLite] END   sqlite_transaction_flag=%d   _ctr=%d   _tmr=%d   loctime->tm_min=%d   diff=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr,sqlite_transaction_tmr,loctime->tm_min,loctime->tm_min-sqlite_transaction_tmr);
 
 //}				
 
