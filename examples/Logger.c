@@ -133,6 +133,7 @@
 
 #ifdef BMP180
 	#include <bmp180.h>
+
 #endif
 
 #ifdef SQLITE
@@ -645,23 +646,24 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	clock_t start, end;
 	double cpu_time_used;
 	start=clock();
-	
+
 //	printf("loop_active_msg_thread=%d\n", loop_active_msg_thread);
-	
+
 	int i;
-	
+
 	double pythondatetime;	// double precision float is 8 bytes = IEEE float used in sqlite real datatype
 	time_t unixtime;
 	struct tm *loctime; 
 	int years2000;
 	int leapdays2000;
-	
+
+	int rc;
 	int rc1=1,delay_time1=10;
 	int rc2=1,delay_time2=10;
-	
+
 	char *ptr;
 	char buffer_top[255], buffer_msg[255];
-	
+
 	//char sql[255];
 	char *sqlErrMsg = 0;
 
@@ -670,6 +672,8 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	char *topic_area;
 	char *topic_type;
 	char *topic_id;
+	char tableName[255];
+
 	FILE *fp;
    
 	double python_datetime_leapdays_since_2000;
@@ -695,6 +699,9 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 	topic_id 		= strtok(NULL, topic_search);
 
 	printf("Topic (broken down): %s %s %s %s \n", topic_location, topic_area, topic_type, topic_id);
+	//printf("%s_%s_%s_%s", topic_location, topic_area, topic_type, topic_id);
+	sprintf(tableName,"%s_%s_%s_%s", topic_location, topic_area, topic_type, topic_id);
+	//printf("tableName = %s\n",tableName);
 
 	//printf("string compares %d %d %d %d %d\n",strcmp(token, "Temp"),strcmp(token, "BP"),strcmp(token, "Hum"),strcmp(token, "Wifi"),strcmp(token, "Contact"));
 
@@ -758,7 +765,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 		loctime=localtime(&unixtime);
 		//loctime=localtime(time(NULL));
 //		printf("localtime = y %d d %d h %d m %d s %d dst %d \n", loctime->tm_year, loctime->tm_yday, loctime->tm_hour, loctime->tm_min, loctime->tm_sec, loctime->tm_isdst);
-		printf("ASCII Current local time and date: %s\n", asctime(loctime));
+//		printf("ASCII Current local time and date: %s\n", asctime(loctime));
 
 
 
@@ -827,7 +834,49 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 			
 //			sql_stmt_ptr=sql_stmt;
 
+
+
+
+			// 2015 AUG
+		        sprintf(sql, "INSERT INTO %s(Time, Value) VALUES(?, ?)", tableName);
+//			printf("sql=%s\n",sql);
+		        rc=sqlite3_prepare_v2(db, sql, strlen(sql), &sql_stmt, NULL);
+		        if (rc)
+		                printf("[SQLite] prepare return code %d: %s\n\n", rc, sqlite3_errmsg(db));
+			printf("sql_stmt=%s\n",sql_stmt);
+
+
+			/*** BIND DATE ***/
+                        rc2=sqlite3_bind_double(sql_stmt, 1, pythondatetime);
+                        if (rc2)
+                                printf("[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+
+
                         /*** BIND VALUE ***/
+                        if((strcmp(topic_type, "Temp")==0)||(strcmp(topic_type, "BP")==0)||(strcmp(topic_type, "Hum")==0))
+                        {
+                                rc2=sqlite3_bind_double(sql_stmt, 2, atof(buffer_msg));
+                                if (rc2)
+                                        printf("[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db)); 
+                        }
+
+                        if( (strcmp(topic_type, "Wifi")==0) || (strcmp(topic_type, "Contact")==0) )
+                        {
+                                rc2=sqlite3_bind_int(sql_stmt, 2, atoi(buffer_msg));
+                                if (rc2)
+                                        printf("[SQLite] bind int return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+                        }
+                        if((strcmp(topic_type, "Command")==0))
+                        {
+                                rc2=sqlite3_bind_text(sql_stmt, 2, buffer_msg, strlen(buffer_msg), 0);
+                                if (rc2)
+                                        printf("[SQLite] bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+                        }
+
+
+
+/*
+                        /*** BIND VALUE ***
                         if((strcmp(topic_type, "Temp")==0)||(strcmp(topic_type, "BP")==0)||(strcmp(topic_type, "Hum")==0))
                         {
 				sql_stmt=sql_stmt_real;
@@ -854,7 +903,9 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
                                         printf("[SQLite] bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 			}
 
-			/*** BIND TOPIC ***/
+			*/
+
+			/*** BIND TOPIC ***
 			rc2=sqlite3_bind_text(sql_stmt, 1, topic_location, strlen(topic_location), 0);
 				if (rc2)
 					printf("[SQLite] bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
@@ -870,11 +921,14 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 			rc2=sqlite3_bind_text(sql_stmt, 4, topic_id, strlen(topic_id), 0);
 				if (rc2)
 					printf("bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+			*/
 
-			/*** BIND DATE ***/
+			/*** BIND DATE **
 			rc2=sqlite3_bind_double(sql_stmt, 5, pythondatetime);
 			if (rc2)
 				printf("[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+
+			*/
 
 			/*** SQL COMMANDS ***/
 			rc2=sqlite3_step(sql_stmt);  // Run SQL INSERT
@@ -1194,10 +1248,11 @@ int main(void)
         if(rc)
         	printf("Can't open database: %s.", sqlite3_errmsg(db));
 
+/*
         sprintf(sql_real, "INSERT INTO Real(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");
         sprintf(sql_int, "INSERT INTO Int(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");
         sprintf(sql_text, "INSERT INTO Text(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");
-        sprintf(sql, "INSERT INTO Real(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");
+        //sprintf(sql, "INSERT INTO Real(Location, Area, Type, ID, DateTime, Value) VALUES(?, ?, ?, ?, ?, ?)");
 
         rc=sqlite3_prepare_v2(db, sql_real, strlen(sql_real), &sql_stmt_real, NULL);
         if (rc)
@@ -1214,6 +1269,7 @@ int main(void)
         rc=sqlite3_prepare_v2(db, sql, strlen(sql), &sql_stmt, NULL);
         if (rc)
                 printf("[SQLite] prepare return code %d: %s\n\n", rc, sqlite3_errmsg(db));
+*/
 #endif	// SQLITE
 
 #ifdef MQTT
