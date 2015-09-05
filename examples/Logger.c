@@ -57,27 +57,25 @@
 	#define CONTACTS
  	#define CPUTEMP
 	#define MQTT
-	#define CONTACTS
 
 #elif HOST == Pi4
 	#define WIFI
 	#define NRF
 	#define ADDRESS     "tcp://localhost:1883"			// MQTT
 	#define CLIENTID    "Pi4"							// MQTT
-//	#define ONE_WIRE
-//	#define BMP180
-//	#define CC2
+	#define ONE_WIRE
+	#define BMP180
+	#define CC2
 //	#define RELAYS
 //	#define CONTACTS
 	#define SQLITE
-	#define HANDLECTLC	
+	#define HANDLECTLC
   	#define CPUTEMP
 	#define MQTT
-//	#define CONTACTS
 
 #else
 	#define WIFI
-	#define NRF	
+	#define NRF
 	#define ADDRESS     "tcp://192.168.1.214:1883"		// MQTT
 	#define CLIENTID    "Default"							// MQTT
 	//#define ONE_WIRE
