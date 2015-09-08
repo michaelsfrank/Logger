@@ -386,7 +386,7 @@ int8_t volatile loop_active_msg_thread = 1;
 			}
 			close(fd);
 		}
-		printf("returning from readTemp\n");
+		//printf("returning from readTemp\n");
 		return 0;
 	}
 #endif
@@ -1667,10 +1667,9 @@ int main(void)
 		// ****************************
 
 		buffer_lf=0;
-		// Read BMP180
 		buffer_lf=getPres(fd_bmp180);
-		printf ("[BMP180] local Pi external pressure sensor %.3lf\n", buffer_lf);
 		sprintf(buffer_char, "%.3lf\0", buffer_lf);
+		//printf ("[BMP180] local Pi external pressure sensor %.3lf\n", buffer_lf);
 
 		// MQTT local bmp180 pressure sensor
 		pubmsg.payload = buffer_char;
