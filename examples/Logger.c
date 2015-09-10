@@ -1783,19 +1783,19 @@ int main(void)
 // 28-0000007c750d  28-0000015dd661  28-000005e50d0a  28-000005e9a47f  28-000005e9e919  28-000005ea9920  28-000005eac141  w1_bus_master1
 
 			if (!strcmp(devNode->devID, "28-0000007c750d"))
-                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/001", &pubmsg, &token);
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/UnderCabin1", &pubmsg, &token);	// Cottage/Mike/Temp/001 - close to splice
                         else if (!strcmp(devNode->devID, "28-0000015dd661"))
-				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/002", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/UnderCabin2", &pubmsg, &token);	// Cottage/Mike/Temp/002 - dangling
 			else if (!strcmp(devNode->devID, "28-000005e50d0a"))
-				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/003", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Earth", &pubmsg, &token);	// Cottage/Mike/Temp/003 - waterproof buried in sand
 			else if (!strcmp(devNode->devID, "28-000005e9a47f"))
-				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/004", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Floor1", &pubmsg, &token);	// Cottage/Mike/Temp/004
 			else if (!strcmp(devNode->devID, "28-000005e9e919"))
-				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/005", &pubmsg, &token);
+				MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Ceiling1", &pubmsg, &token);	// Cottage/Mike/Temp/005 - ceiling
 			else if (!strcmp(devNode->devID, "28-000005ea9920"))
-                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/006", &pubmsg, &token);
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Ceiling2", &pubmsg, &token);	// Cottage/Mike/Temp/006 - ceiling
 			else if (!strcmp(devNode->devID, "28-000005eac141"))
-                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/007", &pubmsg, &token);
+                                MQTTClient_publishMessage(client, "Cottage/Mike/Temp/Floor2", &pubmsg, &token);	// Cottage/Mike/Temp/007 - floor
 #endif
 #if HOST == Pi3
 			if (!strcmp(devNode->devID, "28-04146d2647ff"))
