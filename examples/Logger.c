@@ -73,6 +73,21 @@
   	#define CPUTEMP
 	#define MQTT
 
+#elif HOST == Pi5
+        #define WIFI
+        #define NRF
+        #define ADDRESS     "tcp://localhost:1883"                      // MQTT
+        #define CLIENTID    "Pi5"                                                       // MQTT
+//        #define ONE_WIRE
+//        #define BMP180
+//        #define CC2
+//      #define RELAYS
+//      #define CONTACTS
+        #define SQLITE
+        #define HANDLECTLC
+        #define CPUTEMP
+        #define MQTT
+
 #else
 	#define WIFI
 	#define NRF
@@ -811,7 +826,9 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 
 //if(strcmp(topic_type,"Temp")==0 || strcmp(topic_type,"BP")==0 || strcmp(topic_type,"Hum")==0)
 //{
-			//printf("[SQLite] BEGIN  sqlite_transaction_flag=%d   sqlite_transaction_ctr=%d   sqlite_transaction_tmr=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr,sqlite_transaction_tmr);
+			printf("[SQLite] BEGIN  sqlite_transaction_flag=%d   sqlite_transaction_ctr=%d   sqlite_transaction_tmr=%d\n",sqlite_transaction_flag,sqlite_transaction_ctr,sqlite_transaction_tmr);
+
+
 
 			if (sqlite_transaction_flag==0)
 			{
@@ -1234,6 +1251,8 @@ int main(void)
 		strcpy(hostname,"Pi3\0");
 	#elif HOST == Pi4
 		strcpy(hostname,"Pi4\0");
+        #elif HOST == Pi5
+                strcpy(hostname,"Pi5\0");
 	#else
 		strcpy(hostname,"unknown\0");
 	#endif
@@ -1429,6 +1448,8 @@ int main(void)
                 rf24_initialize(&radio, RF24_SPI_DEV_0, 25, 7);
         #elif HOST == Pi4
                 rf24_initialize(&radio, RF24_SPI_DEV_0, 25, 7);
+        #elif HOST == Pi5
+                rf24_initialize(&radio, RF24_SPI_DEV_0, 25, 7);
         #else
                 rf24_initialize(&radio, RF24_SPI_DEV_0, 25, 7);
         #endif
@@ -1517,7 +1538,7 @@ int main(void)
 		pubmsg.payloadlen = strlen(buffer_char);
 		MQTTClient_publishMessage(client, "Home/Garage/Contact/DoorFar", &pubmsg, &token);
 
-#elif HOST == Pi4
+#elif HOST == Pi5
 		sprintf(buffer_char,"%d",!digitalRead(STATUS1));
 		pubmsg.payload = buffer_char;
 		pubmsg.payloadlen = strlen(buffer_char);
@@ -1681,7 +1702,7 @@ int main(void)
 		MQTTClient_publishMessage(client, "Cottage/Mike/BP/002", &pubmsg, &token);
 #elif HOST == Pi3
 		MQTTClient_publishMessage(client, "Home/Garage/BP/001", &pubmsg, &token);
-#elif HOST == Pi4
+#elif HOST == Pi5
 		MQTTClient_publishMessage(client, "Home/Mike/BP/001", &pubmsg, &token);
 #endif
 #endif	// BMP180
@@ -1708,7 +1729,7 @@ int main(void)
 		MQTTClient_publishMessage(client, "Home/Garage/Hum/001", &pubmsg, &token);
 #elif HOST == Pi3
 		MQTTClient_publishMessage(client, "Home/Garage/Hum/001", &pubmsg, &token);
-#elif HOST == Pi4
+#elif HOST == Pi5
 		MQTTClient_publishMessage(client, "Home/Mike/Hum/001", &pubmsg, &token);
 #endif
 
@@ -1806,7 +1827,7 @@ int main(void)
 			else if (!strcmp(devNode->devID, "28-04146cf597ff"))
 				MQTTClient_publishMessage(client, "Home/Outside/Temp/001", &pubmsg, &token);
 #endif
-#if HOST == Pi4
+#if HOST == Pi5
 			if (!strcmp(devNode->devID, "28-04146c93f6ff"))
 				MQTTClient_publishMessage(client, "Home/Mike/Temp/001", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-04146d1220ff"))
