@@ -76,7 +76,12 @@
 #elif HOST == Pi5
         #define WIFI
         #define NRF
-        #define ADDRESS     "tcp://localhost:1883"                      // MQTT
+//        #define ADDRESS     "tcp://localhost:22883"                      // MQTT
+        #define ADDRESS     "tcp://127.0.0.1:22883"                      // MQTT
+//        define ADDRESS     "tls://127.0.0.1:22883"                      // MQTT
+//		#define ADDRESS     "ssl://192.168.1.215:22883"                      // MQTT
+//		#define ADDRESS     "tls://192.168.1.215:22883"                      // MQTT
+//		#define ADDRESS     "ssl://test.mosquitto.org:8883"                      // MQTT
         #define CLIENTID    "Pi5"                                                       // MQTT
 //        #define ONE_WIRE
 //        #define BMP180
@@ -258,7 +263,7 @@ int8_t volatile loop_active_msg_thread = 1;
 	sqlite3 *db = NULL;
 
 	// Path to DB file - same dir as this program's executable
-	char *dbPath = "/var/www/Logger.db";
+	char *dbPath = "/var/www//db/Logger.db";
 
 	char sql[255];
 	char sql_real[255];
@@ -1292,18 +1297,53 @@ int main(void)
 #ifdef MQTT
 	//MQTT
     char MQTT_topic[256]={0};
+	
 	MQTTClient client;
-    MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
-    MQTTClient_message pubmsg = MQTTClient_message_initializer;
-    MQTTClient_deliveryToken token;
-	pubmsg.qos = QOS;
-	pubmsg.retained = 0;
-	deliveredtoken = 0;
+	
+	// http://www.eclipse.org/paho/files/mqttdoc/Cclient/struct_m_q_t_t_client___s_s_l_options.html
+    //MQTTClient_SSLOptions ssl_opts = MQTTClient_SSLOptions_initializer;
+    
+	// The file in PEM format containing the public digital certificates trusted by the client. 
+    //ssl_opts.trustStore="/etc/mosquitto/certs/ca.crt";
+    //ssl_opts.trustStore="/etc/mosquitto/certs/Pi5.crt";
+    //ssl_opts.trustStore="/etc/mosquitto/certs/mosquitto.org.crt";
 
-	// MQTT Create client and connect to broker
-    MQTTClient_create(&client, ADDRESS, CLIENTID, MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    // The file in PEM format containing the public certificate chain of the client. It may also include the client's private key. 
+    //ssl_opts.keyStore="/etc/mosquitto/certs/ca.crt";
+    //ssl_opts.keyStore="/etc/mosquitto/certs/Pi5.crt";
+    //ssl_opts.keyStore="/etc/mosquitto/certs/mosquitto.org.crt";
+
+    // If not included in the sslKeyStore, this setting points to the file in PEM format containing the client's private key. 
+    //ssl_opts.privateKey="/etc/mosquitto/private/Pi5.key";
+    //ssl_opts.privateKeyPassword = "";
+    
+    //ssl_opts.enabledCipherSuites = "";
+    //ssl_opts.enabledCipherSuites = "TLSv1.2";
+    //ssl_opts.enableServerCertAuth = 0;
+    // Since the CN in the certificate that the Mosquitto broker uses does not match the machines name, I added: sslopts.enableServerCertAuth = 0; Obviously, this reduces the security a bit, once the software is ready to go, this line will be removed and a proper certificate will be used.
+
+	// http://www.eclipse.org/paho/files/mqttdoc/Cclient/struct_m_q_t_t_client__connect_options.html
+	MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
     conn_opts.keepAliveInterval = 20;
     conn_opts.cleansession = 1;
+    //conn_opts.username = "password";
+    //conn_opts.password = "username";
+    //conn_opts.ssl = &ssl_opts;  
+
+    // Test suite from IBM
+    // https://github.com/eclipse/paho.mqtt.c/blob/master/test/test3.c
+
+	MQTTClient_message pubmsg = MQTTClient_message_initializer;
+	pubmsg.qos = QOS;
+	pubmsg.retained = 0;
+
+	MQTTClient_deliveryToken token;
+	deliveredtoken = 0;
+
+	//printf("[Logger] MQTT options: %s %s %s\n",ADDRESS, CLIENTID, ssl_opts.trustStore);
+
+	// MQTT Create client, set call back, connect to broker
+    MQTTClient_create(&client, ADDRESS, CLIENTID, MQTTCLIENT_PERSISTENCE_NONE, NULL);
     MQTTClient_setCallbacks(client, NULL, connlost, msgarrvd, delivered);
     if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS)
     {
@@ -2044,3 +2084,4 @@ int main(void)
 	
 	return 0 ;
 }	// MAIN
+
