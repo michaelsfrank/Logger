@@ -1872,6 +1872,7 @@ int main(void)
 				MQTTClient_publishMessage(client, "Home/Mike/Temp/001", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-04146d1220ff"))
 				MQTTClient_publishMessage(client, "Home/Mike/Temp/002", &pubmsg, &token);
+			else if (!strcmp(devNode->devID, "28-03155105aaff"))
 #endif
 
 			//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "...");
