@@ -872,7 +872,33 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
                                 printf("[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 
 
+
+			// MAYBE ALL I NEED TO DO IS ADD ELSE IFS TO EXISTING CODE
+
+			// TODO: too many string compares follow, change to ladder if, if else, and assign intermediate variable for sqlite bind type
+			//int sqlite_type=0;
+			//if (strcmp(topic_type, "Temp")==0)
+			//	sqlite_type=1;  // double
+			//else if (strcmp(topic_type, "BP")==0)
+			//	sqlite_type=1;  // double
+                        //else if (strcmp(topic_type, "Hum")==0)
+                        //      sqlite_type=1;  // double
+                        //else if (strcmp(topic_type, "Wifi")==0)
+                        //      sqlite_type=2;  // int
+                        //else if (strcmp(topic_type, "Contact")==0)
+                        //      sqlite_type=2;  // int
+                        //else if (strcmp(topic_type, "Command")==0)
+                        //      sqlite_type=3;  // text
+                        //else if 
+                        //      sqlite_type=;  // 
+                        //else if 
+                        //      sqlite_type=;  // 
+			//}
+
+			//TODO: above commented code might work, second half needs
+
                         /*** BIND VALUE ***/
+			//if (sqlite_type=0)
                         if((strcmp(topic_type, "Temp")==0)||(strcmp(topic_type, "BP")==0)||(strcmp(topic_type, "Hum")==0))
                         {
                                 rc2=sqlite3_bind_double(sql_stmt, 2, atof(buffer_msg));
@@ -880,12 +906,15 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
                                         printf("[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db)); 
                         }
 
+                        //else if (sqlite_type=1)
                         if( (strcmp(topic_type, "Wifi")==0) || (strcmp(topic_type, "Contact")==0) )
                         {
                                 rc2=sqlite3_bind_int(sql_stmt, 2, atoi(buffer_msg));
                                 if (rc2)
                                         printf("[SQLite] bind int return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
                         }
+
+                        //else if (sqlite_type=2)
                         if((strcmp(topic_type, "Command")==0))
                         {
                                 rc2=sqlite3_bind_text(sql_stmt, 2, buffer_msg, strlen(buffer_msg), 0);
