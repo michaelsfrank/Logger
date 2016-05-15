@@ -903,7 +903,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
                         {
                                 rc2=sqlite3_bind_double(sql_stmt, 2, atof(buffer_msg));
                                 if (rc2)
-                                        printf("[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db)); 
+                                        fprintf(stderr,"[SQLite] bind double return code %d: %s\n\n", rc2, sqlite3_errmsg(db)); 
                         }
 
                         //else if (sqlite_type=1)
@@ -911,7 +911,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
                         {
                                 rc2=sqlite3_bind_int(sql_stmt, 2, atoi(buffer_msg));
                                 if (rc2)
-                                        printf("[SQLite] bind int return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+                                        fprintf(stderr,"[SQLite] bind int return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
                         }
 
                         //else if (sqlite_type=2)
@@ -919,7 +919,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
                         {
                                 rc2=sqlite3_bind_text(sql_stmt, 2, buffer_msg, strlen(buffer_msg), 0);
                                 if (rc2)
-                                        printf("[SQLite] bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+                                        fprintf(stderr,"[SQLite] bind text return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
                         }
 
 
@@ -982,24 +982,24 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTClient_message *m
 			/*** SQL COMMANDS ***/
 			rc2=sqlite3_step(sql_stmt);  // Run SQL INSERT
 			if (rc2 && (rc2 != 101))
-				printf("[SQLite] step return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+				fprintf(stderr,"[SQLite] step return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 //			printf("[SQLite]  Step completed\n");
 
 			rc2=sqlite3_clear_bindings(sql_stmt);
 			if (rc2)
-				printf("[SQLite] reset return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+				fprintf(stderr,"[SQLite] clear bindings return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 //			printf("[SQLite]  Clear bindings completed\n");
 			
 			rc2=sqlite3_reset(sql_stmt); // Clear statement handle for next use
 			if (rc2)
-				printf("[SQLite] reset return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
+				fprintf(stderr,"[SQLite] reset return code %d: %s\n\n", rc2, sqlite3_errmsg(db));
 //			printf("[SQLite]  Reset completed\n");
 
 			if (sqlite_transaction_flag==2)
 			{
 				sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &sqlErrMsg);
 				if(sqlErrMsg)
-					printf("[SQLite] End Transaction Error: %s\n\n", sqlErrMsg);
+					fprintf(stderr,"[SQLite] End Transaction Error: %s\n\n", sqlErrMsg);
 				sqlite_transaction_flag=0;
 				sqlite_transaction_ctr=0;
 				sqlite_transaction_tmr=loctime->tm_min;
