@@ -83,9 +83,9 @@
 //		#define ADDRESS     "tls://192.168.1.215:22883"                      // MQTT
 //		#define ADDRESS     "ssl://test.mosquitto.org:8883"                      // MQTT
         #define CLIENTID    "Pi5"                                                       // MQTT
-//        #define ONE_WIRE
-//        #define BMP180
-//        #define CC2
+        #define ONE_WIRE
+        #define BMP180
+        #define CC2
 //      #define RELAYS
 //      #define CONTACTS
         #define SQLITE
@@ -249,9 +249,8 @@ int8_t volatile loop_active_msg_thread = 1;
 
 #ifdef HANDLECTLC
 	#include <signal.h> 
-	// Called when user presses Ctrl-C
 	void intHandler() {
-		printf("\nStopping...\n");
+		fprintf(stderr, "\nSIGINT Signal Interupt Ctrl-C - setting flag to close out sqlite transaction...\n");
 		loop_active_main = 0;
 	}
 #endif
@@ -1902,6 +1901,8 @@ int main(void)
 			else if (!strcmp(devNode->devID, "28-04146d1220ff"))
 				MQTTClient_publishMessage(client, "Home/Mike/Temp/002", &pubmsg, &token);
 			else if (!strcmp(devNode->devID, "28-03155105aaff"))
+				MQTTClient_publishMessage(client, "Home/Mike/Temp/003", &pubmsg, &token);
+
 #endif
 
 			//printf("[MQTT] %s on topic %s\n", pubmsg.payload, "...");
