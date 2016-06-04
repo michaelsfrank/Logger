@@ -262,7 +262,7 @@ int8_t volatile loop_active_msg_thread = 1;
 	sqlite3 *db = NULL;
 
 	// Path to DB file - same dir as this program's executable
-	char *dbPath = "/var/www//db/Logger.db";
+	char *dbPath = "/var/www/db/Logger.db";
 
 	char sql[255];
 	char sql_real[255];
